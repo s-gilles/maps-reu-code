@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-from cypari import *
 from snappy import *
+from cypari import *
 import errno
 import fcntl
 import os
@@ -17,6 +17,8 @@ import traceback
 # `configuration' variables between runs/machines
 THREAD_NUM = 16
 SNAP_PATH='/usr/local/bin/snap'
+CENSUS=LinkExteriors[:40]
+TRIG_PATH='./triangulations/linkexteriors'
 
 # Each snap process is managed by one python thread.
 snap_process = [ ]
@@ -48,7 +50,17 @@ def write_dict_to_output():
         deg = '0'
         if dm is not None:
             deg = dm.group(1)
-        ncp = pari(poly).nfinit()[1][1]
+        ncp = 0
+        rlist = []
+        for r in pari(poly).polroots():
+            rlist.append(r)
+        while len(rlist) > 0:
+            for x in rlist[1:]:
+                if x.real() == rlist[0].real() and x.imag() == -1*rlist[0].imag():
+                    ncp += 1
+                    rlist.remove(x)
+                    break
+            del rlist[0]
         disc = str(pari(poly).nfdisc())
         for vol, l in data.iteritems():
             for m in l:
@@ -118,11 +130,14 @@ def compute_shape_fields(idx):
         if sig:
             merge_up_dict(local_dict)
             return
-
-        manifold.save(fname)
+        if os.path.isfile(TRIG_PATH+"/"+manifold.name()+".trig"):
+            dname = TRIG_PATH+"/"+manifold.name()+".trig"
+        else:
+            dname = fname
+            manifold.save(fname)
         while True:
             try:
-                send_cmd(snap_process[idx], 'read file ' + fname)
+                send_cmd(snap_process[idx], 'read file ' + dname)
                 send_cmd(snap_process[idx], 'compute shape')
                 break
             except IOError:
@@ -183,11 +198,7 @@ if __name__ == "__main__":
 
     # To change this out for triangulation files, send in (pathname, False)
     print('Collecting manifold information')
-    # for m in OrientableCuspedCensus:
-    #     ready_manifolds.put((m, False))
-    # for m in HTLinkExteriors:
-    #     ready_manifolds.put((m, False))
-    for m in LinkExteriors:
+    for m in CENSUS:
         ready_manifolds.put((m, False))
 
     # Make sure the magic join flags are there

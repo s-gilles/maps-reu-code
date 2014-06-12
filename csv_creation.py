@@ -96,7 +96,7 @@ def kickoff_snap():
         snap_out = cprocess.stdout.readline().decode(encoding='UTF-8').rstrip()
 
     send_cmd(cprocess, 'set precision 10\n')
-    send_cmd(cprocess, 'set digits_printed 100\n')
+    send_cmd(cprocess, 'set digits_printed 100 f\n')
 
     return cprocess
 

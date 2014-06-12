@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-from snappy import *
 from cypari import *
+from snappy import *
 import errno
 import fcntl
 import os

@@ -45,7 +45,7 @@ full_list_lock = threading.Lock()
 def write_dict_to_output():
     f = open('output.csv', 'w')
     f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,NumberOfComplexPlaces,Disc\n')
-    for poly,data in full_list.iteritems():
+    for poly,data in sorted(full_list.items()):
         dm = re.match('x\^([0-9]+).*', poly)
         deg = '0'
         if dm is not None:
@@ -62,7 +62,7 @@ def write_dict_to_output():
                     break
             del rlist[0]
         disc = str(pari(poly).nfdisc())
-        for vol, l in data.iteritems():
+        for vol, l in sorted(data.items()):
             for m in l:
                 f.write('"' + m.name() + '",')
                 f.write('"' + str(m.num_tetrahedra()) + '",')

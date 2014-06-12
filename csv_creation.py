@@ -95,6 +95,9 @@ def kickoff_snap():
     while not re.match('snap [0-9.]+', snap_out):
         snap_out = cprocess.stdout.readline().decode(encoding='UTF-8').rstrip()
 
+    send_cmd(cprocess, 'set precision 10\n')
+    send_cmd(cprocess, 'set digits_printed 100\n')
+
     return cprocess
 
 # Emulates typing string into a terminal running process. Note that since snap
@@ -130,6 +133,7 @@ def compute_shape_fields(idx):
         if sig:
             merge_up_dict(local_dict)
             return
+
         if os.path.isfile(TRIG_PATH+"/"+manifold.name()+".trig"):
             dname = TRIG_PATH+"/"+manifold.name()+".trig"
         else:
@@ -138,7 +142,7 @@ def compute_shape_fields(idx):
         while True:
             try:
                 send_cmd(snap_process[idx], 'read file ' + dname)
-                send_cmd(snap_process[idx], 'compute shape')
+                send_cmd(snap_process[idx], 'compute invariant_trace_field')
                 break
             except IOError:
                 print(manifold.name() + ' crashed snap! [but we think we can fix it]')
@@ -156,10 +160,10 @@ def compute_shape_fields(idx):
                 snap_process[idx] = kickoff_snap()
                 break
 
-            shape_match = re.match('Shape field: ([-+*x0-9^]+) .*', snap_out)
-            if shape_match is not None:
+            trace_match = re.match('Invariant trace field: ([-+*x0-9^]+) .*', snap_out)
+            if trace_match is not None:
                 vol = str(manifold.volume())
-                polynomial = shape_match.group(1).strip()
+                polynomial = trace_match.group(1).strip()
                 dm = re.match('x\^([0-9]+).*', polynomial)
                 degree = 0
                 if dm is not None:

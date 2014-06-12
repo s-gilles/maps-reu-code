@@ -44,32 +44,26 @@ full_list_lock = threading.Lock()
 
 def write_dict_to_output():
     f = open('output.csv', 'w')
-    f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,NumberOfComplexPlaces,Disc\n')
+    f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc\n')
     for poly,data in sorted(full_list.items()):
         dm = re.match('x\^([0-9]+).*', poly)
         deg = '0'
         if dm is not None:
             deg = dm.group(1)
-        ncp = 0
-        rlist = []
-        for r in pari(poly).polroots():
-            rlist.append(r)
-        while len(rlist) > 0:
-            for x in rlist[1:]:
-                if x.real() == rlist[0].real() and x.imag() == -1*rlist[0].imag():
-                    ncp += 1
-                    rlist.remove(x)
-                    break
-            del rlist[0]
         disc = str(pari(poly).nfdisc())
         for vol, l in sorted(data.items()):
-            for m in l:
+            for rec in l:
+                #unpack tuples
+                m = rec[0]
+                ncp = rec[1]
+                root = rec[2]
                 f.write('"' + m.name() + '",')
                 f.write('"' + str(m.num_tetrahedra()) + '",')
                 f.write('"' + vol + '",')
                 f.write('"' + poly + '",')
                 f.write('"' + deg + '",')
-                f.write('"' + str(ncp) + '",')
+                f.write('"' + rec[2] + '",')
+                f.write('"' + str(rec[1]) + '",')
                 f.write('"' + disc + '"\n')
     f.close()
 
@@ -114,9 +108,9 @@ def merge_up_dict(local_dict):
     full_list_lock.acquire()
     for polynomial_str, local_polydict in local_dict.items():
         fulls_polydict = full_list.setdefault(polynomial_str, dict())
-        for vol, manifolds in local_polydict.items():
+        for vol, manifold_records in local_polydict.items():
             fulls_manifolds = fulls_polydict.setdefault(vol, list())
-            fulls_manifolds.extend(manifolds)
+            fulls_manifolds.extend(manifold_records)
     full_list_lock.release()
 
 def compute_shape_fields(idx):
@@ -166,6 +160,8 @@ def compute_shape_fields(idx):
                 polynomial = trace_match.group(1).strip()
                 dm = re.match('x\^([0-9]+).*', polynomial)
                 degree = 0
+                ncp = int(snap_out[snap_out.find(',')+1:snap_out.find(']')])
+                root = snap_out[snap_out.find('=')+2:]
                 if dm is not None:
                     degree = int(dm.group(1))
                 if degree > 8:
@@ -173,7 +169,8 @@ def compute_shape_fields(idx):
 
                 by_poly = local_dict.setdefault(polynomial, dict())
                 by_volume = by_poly.setdefault(vol, list())
-                by_volume.append(manifold)
+                # All the information to be sent back from the threads is packed in a tuple:
+                by_volume.append((manifold,ncp,root))
                 break
         ready_manifolds.task_done()
 

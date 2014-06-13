@@ -161,7 +161,7 @@ def compute_shape_fields(idx):
                 dm = re.match('x\^([0-9]+).*', polynomial)
                 degree = 0
                 ncp = int(snap_out[snap_out.find(',')+1:snap_out.find(']')])
-                root = snap_out[snap_out.find('=')+2:]
+                root = snap_out[snap_out.find('=')+2:-1]
                 if dm is not None:
                     degree = int(dm.group(1))
                 if degree > 8:
@@ -180,7 +180,7 @@ def worker_action(idx):
 
 
 if __name__ == "__main__":
-
+    
     # Fiddle about with waiting for workers to startup
     print('Initializing workers')
     worker_threads = dict()

@@ -272,7 +272,7 @@ def sigusr1_handler(sig, frame):
 
 
 if __name__ == "__main__":
-
+    
     # Fiddle about with waiting for workers to startup
     print('Initializing...')
     worker_threads = list()

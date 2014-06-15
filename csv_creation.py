@@ -24,12 +24,14 @@ CENSUS_CHUNK_SIZE = 50
 SNAP_PATH='/usr/local/bin/snap'
 TRIG_PATH='./triangulations/linkexteriors'
 
-ACT_DIE = 'die now'
-ACT_CENSUS = 'continually dump from census'
-main_action = ACT_CENSUS
-
 SIG_FINISH = 1
 SIG_DIE = 2
+SIG_MERGE = 3
+
+ACT_DIE = 10
+ACT_CENSUS = 11
+ACT_COLLECT = 12
+main_action = ACT_CENSUS
 
 RE_INV_TRACE_FIELD_NOT_FOUND = re.compile('.*Invariant trace field not found.*', re.DOTALL)
 RE_FUNC_REQ_GROUP = re.compile('.*Function requires a group.*', re.DOTALL)
@@ -148,7 +150,7 @@ def merge_up_dict(local_dict):
                 fulls_manifolds.extend(manifold_records)
 
 def compute_shape_fields(idx):
-    global SIG_FINISH, SIG_DIE
+    global SIG_FINISH, SIG_DIE, SIG_MERGE
     local_dict = dict()
     fname = 'tmp' + str(idx) + '.trig'
     snap_output = ''
@@ -167,6 +169,11 @@ def compute_shape_fields(idx):
         elif sig is SIG_DIE:
             ready_manifolds.task_done()
             break
+        elif sig is SIG_MERGE:
+            merge_up_dict(local_dict)
+            local_dict = dict()
+            ready_manifolds.task_done()
+            continue
 
         if os.path.isfile(TRIG_PATH+"/"+manifold.name()+".trig"):
             dname = TRIG_PATH+"/"+manifold.name()+".trig"
@@ -252,6 +259,11 @@ def sigint_handler(signum, frame):
     print('\nDying. Please wait for worker threads to terminate. (^C again REALLY kills)')
     signal.signal(signal.SIGINT, double_sigint_handler)
 
+def sigusr2_handler(sig, frame):
+    global main_action
+    main_action = ACT_COLLECT
+    print('Writing out current progress. Please wait.')
+
 def sigusr1_handler(sig, frame):
     """Interrupt running process, and provide a python prompt for
     interactive debugging."""
@@ -272,7 +284,6 @@ def sigusr1_handler(sig, frame):
 
 
 if __name__ == "__main__":
-    
     # Fiddle about with waiting for workers to startup
     print('Initializing...')
     worker_threads = list()
@@ -286,8 +297,16 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGINT, sigint_handler)
     signal.signal(signal.SIGUSR1, sigusr1_handler)
+    signal.signal(signal.SIGUSR2, sigusr2_handler)
 
-    census_chunks_ocm = iter(LinkExteriors)
+    all_manifolds = list()
+    all_manifolds.extend(LinkExteriors)
+    all_manifolds.extend(OrientableCuspedCensus)
+    all_manifolds.extend(HTLinkExteriors)
+
+    census_chunks_ocm = iter(all_manifolds)
+
+    print('Working...')
 
     while True:
         if main_action is ACT_DIE:
@@ -296,6 +315,15 @@ if __name__ == "__main__":
             for i in range(0, THREAD_NUM):
                 ready_manifolds.put((None, SIG_DIE))
             break
+        elif main_action is ACT_COLLECT:
+            for i in range(0, THREAD_NUM):
+                ready_manifolds.put((None, SIG_MERGE))
+            while not ready_manifolds.empty():
+                time.sleep(0.05)
+            write_dict_to_output()
+            print('Wrote out current progress')
+            main_action = ACT_CENSUS
+            continue
         elif main_action is ACT_CENSUS:
             try:
                 for i in range(0,CENSUS_CHUNK_SIZE):
@@ -308,7 +336,7 @@ if __name__ == "__main__":
 
         # Would like to .join() here, but must use sleep() for signaling, or
         # some hogwash
-        while (not ready_manifolds.empty()):
+        while not ready_manifolds.empty():
             time.sleep(0.05)
 
     # Ditto, can't .join()

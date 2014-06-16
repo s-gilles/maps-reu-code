@@ -3,7 +3,7 @@
 from __future__ import print_function
 from snappy import *
 from cypari import *
-import ManifoldGenerators
+import ManifoldIterators
 import Queue
 import code
 import errno
@@ -31,8 +31,10 @@ SIG_MERGE = 3
 
 ACT_DIE = 10
 ACT_CENSUS = 11
-ACT_COLLECT = 12
-main_action = ACT_CENSUS
+ACT_DEHN = 12
+ACT_COLLECT = 19
+main_action = ACT_DEHN
+last_action = None
 
 RE_INV_TRACE_FIELD_NOT_FOUND = re.compile('.*Invariant trace field not found.*', re.DOTALL)
 RE_FUNC_REQ_GROUP = re.compile('.*Function requires a group.*', re.DOTALL)
@@ -82,7 +84,7 @@ def write_dict_to_output():
                 m = rec[0]
                 ncp = rec[1]
                 root = rec[2]
-                f.write('"' + m.name() + '",')
+                f.write('"' + str(m) + '",')
                 f.write('"' + str(m.num_tetrahedra()) + '",')
                 f.write('"' + vol + '",')
                 f.write('"' + poly + '",')
@@ -180,8 +182,8 @@ def compute_shape_fields(idx):
             ready_manifolds.task_done()
             continue
 
-        if os.path.isfile(TRIG_PATH+"/"+manifold.name()+".trig"):
-            dname = TRIG_PATH+"/"+manifold.name()+".trig"
+        if os.path.isfile(TRIG_PATH+"/"+str(manifold)+".trig"):
+            dname = TRIG_PATH+"/"+str(manifold)+".trig"
         else:
             dname = fname
             manifold.save(fname)
@@ -199,7 +201,7 @@ def compute_shape_fields(idx):
                 # the call AFTER the killer
                 break
             except IOError:
-                print(manifold.name() + ' crashed snap in ' + str(idx) + '!')
+                print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
                 snap_process[idx].terminate()
                 snap_process[idx] = kickoff_snap()
                 continue
@@ -211,7 +213,7 @@ def compute_shape_fields(idx):
             elif RE_FUNC_REQ_GROUP.match(snap_output):
                 break
             elif RE_ERROR.match(snap_output):
-                print(manifold.name() + ' crashed snap in ' + str(idx) + '!')
+                print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
                 snap_process[idx].terminate()
                 snap_process[idx] = kickoff_snap()
                 print(str(idx) + ' recovered')
@@ -227,7 +229,7 @@ def compute_shape_fields(idx):
                 root = trace_match.group(3).strip()
                 if dm is not None:
                     degree = int(dm.group(1))
-                if degree <= 8:
+                if degree <= 24:
                     by_poly = local_dict.setdefault(polynomial, dict())
                     by_volume = by_poly.setdefault(vol, list())
                     # All the information to be sent back from the threads is packed in a tuple:
@@ -268,6 +270,9 @@ def sigint_handler(signum, frame):
 
 def sigusr2_handler(sig, frame):
     global main_action
+    global last_action
+    if last_action is None:
+        last_action = main_action
     main_action = ACT_COLLECT
     print('Writing out current progress. Please wait.')
 
@@ -311,7 +316,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, sigusr1_handler)
     signal.signal(signal.SIGUSR2, sigusr2_handler)
 
-    simple_generator = ManifoldGenerators.SimpleGenerator()
+    simple_iterator = ManifoldIterators.SimpleIterator()
+    dehn_fill_iterator = ManifoldIterators.DehnFillIterator()
 
     print('Working...')
 
@@ -328,19 +334,23 @@ if __name__ == "__main__":
             while not ready_manifolds.empty():
                 time.sleep(0.05)
             write_dict_to_output()
-            print('Wrote out current progress')
-            main_action = ACT_CENSUS
+            print('Wrote out current progress.')
+            main_action = last_action
+            last_action = None
             continue
         elif main_action is ACT_CENSUS:
             try:
-                for m in simple_generator.next_batch(CENSUS_CHUNK_SIZE):
+                for m in simple_iterator.next_batch(CENSUS_CHUNK_SIZE):
                     ready_manifolds.put((m, None))
-                # for i in range(0,CENSUS_CHUNK_SIZE):
-                #     ready_manifolds.put((census_chunks_ocm.next(), None))
             except:
-                print('Done. Finishing up.')
-                for i in range(0, THREAD_NUM):
-                    ready_manifolds.put((None, SIG_FINISH))
+                print('Done with basic census.')
+                main_action = ACT_DEHN
+        elif main_action is ACT_DEHN:
+            try:
+                for m in dehn_fill_iterator.next_batch(CENSUS_CHUNK_SIZE):
+                    ready_manifolds.put((m, None))
+            except:
+                print('Done with dehn fillings.')
                 break
 
         # Would like to .join() here, but must use sleep() for signaling, or

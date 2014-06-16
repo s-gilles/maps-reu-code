@@ -3,6 +3,7 @@
 from __future__ import print_function
 from snappy import *
 from cypari import *
+import ManifoldGenerators
 import Queue
 import code
 import errno
@@ -299,12 +300,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, sigusr1_handler)
     signal.signal(signal.SIGUSR2, sigusr2_handler)
 
-    all_manifolds = list()
-    all_manifolds.extend(LinkExteriors)
-    all_manifolds.extend(OrientableCuspedCensus)
-    all_manifolds.extend(HTLinkExteriors)
-
-    census_chunks_ocm = iter(all_manifolds)
+    simple_generator = ManifoldGenerators.SimpleGenerator()
 
     print('Working...')
 
@@ -326,8 +322,10 @@ if __name__ == "__main__":
             continue
         elif main_action is ACT_CENSUS:
             try:
-                for i in range(0,CENSUS_CHUNK_SIZE):
-                    ready_manifolds.put((census_chunks_ocm.next(), None))
+                for m in simple_generator.next_batch(CENSUS_CHUNK_SIZE):
+                    ready_manifolds.put((m, None))
+                # for i in range(0,CENSUS_CHUNK_SIZE):
+                #     ready_manifolds.put((census_chunks_ocm.next(), None))
             except:
                 print('Done. Finishing up.')
                 for i in range(0, THREAD_NUM):

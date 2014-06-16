@@ -95,24 +95,30 @@ class FixedTorusBundleIterator:
         return self
 
     def next(self, default = None):
-        try:
-            bstr = self.src.next()
-        except StopIteration:
-            if default is not None:
-                return default
-            else:
-                raise StopIteration
-        ostr = 'bo'
-        if bstr[0]:
-            ostr += '-R'
-        else:
-            ostr += '+R'
-        for v in bstr:
-            if v:
-                ostr += 'L'
-            else:
-                ostr += 'R'
-        return Manifold(ostr)
+        while True:
+            try:
+                try:
+                    bstr = self.src.next()
+                except StopIteration:
+                    if default is not None:
+                        return default
+                    else:
+                        raise StopIteration
+                ostr = 'bo'
+                if bstr[0]:
+                    ostr += '-R'
+                else:
+                    ostr += '+R'
+                for v in bstr:
+                    if v:
+                        ostr += 'L'
+                    else:
+                        ostr += 'R'
+                out = Manifold(ostr)
+                break
+            except (IOError, AttributeError, ValueError): # In the rare case the string was invalid.
+                continue
+        return out
 
 class TorusBundleIterator:
     def __init__(self, start=2): # start may be int (number of simplices) or manifold
@@ -132,7 +138,7 @@ class TorusBundleIterator:
     def next(self, default = None):
         while True:
             try:
-                return selfsrc.next()
+                return self.src.next()
             except StopIteration:
                 self.l += 1
                 self.src = FixedTorusBundleIterator(self.l)

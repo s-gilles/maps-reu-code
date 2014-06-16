@@ -9,17 +9,17 @@ from itertools import permutations
 class LastIterator:
     def __init__(self,iterator):
         self.it = iterator
-        self.last = None
+        self.last_item = None
 
     def __iter__(self):
         return self
 
     def last(self):
-        return self.last
+        return self.last_item
 
     def next(self, default = None):
         self.last = self.it.next(default = default)
-        return self.last
+        return self.last_item
 
 # Because itertools returns the same thing more than once.
 class MaskIterator:
@@ -35,7 +35,7 @@ class MaskIterator:
     def __iter__(self):
         return self
 
-    # Gives all lists of self.length with boolean values with up to self.max_true Trues 
+    # Gives all lists of self.length with boolean values with up to self.max_true Trues
     def next(self, default = None):
             # produce output
             out = [False]*self.length

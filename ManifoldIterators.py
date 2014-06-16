@@ -18,8 +18,15 @@ class LastIterator:
         return self.last_item
 
     def next(self, default = None):
-        self.last = self.it.next(default = default)
+        try:
+            self.last_item = self.it.next()
+        except StopIteration:
+            if default is not None:
+                return default
+            else:
+                raise
         return self.last_item
+            
 
 # Because itertools returns the same thing more than once.
 class MaskIterator:

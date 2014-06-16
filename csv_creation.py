@@ -39,6 +39,8 @@ RE_FUNC_REQ_GROUP = re.compile('.*Function requires a group.*', re.DOTALL)
 RE_ERROR = re.compile('.*Error.*', re.DOTALL)
 RE_TRACE_FIELD = re.compile('.*Invariant trace field: ([-+*x0-9^]+) \[[0-9]+,([0-9]+)\] [-0-9]+ R\([-0-9]+\) = ([-+*0-9.I]+).*', re.DOTALL)
 
+pari.set_real_precision(100)
+
 # Each snap process is managed by one python thread.
 snap_process = [ ]
 for i in range(0, THREAD_NUM):
@@ -215,7 +217,7 @@ def compute_shape_fields(idx):
 
             trace_match = RE_TRACE_FIELD.match(snap_output)
             if trace_match is not None:
-                vol = str(manifold.volume())
+                vol = str(manifold.high_precision().volume())
                 polynomial = trace_match.group(1).strip()
                 dm = re.match('x\^([0-9]+).*', polynomial)
                 degree = 0

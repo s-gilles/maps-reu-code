@@ -27,6 +27,25 @@ class LastIterator:
                 raise
         return self.last_item
             
+# Generalized ability to grab a batch from an iterator 'source'.
+class BatchIterator:
+    def __init__(self,source,batch_size):
+        self.source = source
+        self.def_batch_size = batch_size
+
+    def next(self):
+            return self.source.next()
+
+    def next_batch(self, batch_size = -1):  # Default value that indicates preset batch_size.       
+        if batch_size <= 0:
+            batch_size = self.def_batch_size        
+        ret = [self.source.next()]   # Raise StopIteration if nothing to return at all.
+        for i in xrange(batch_size - 1):
+            try:
+                ret.append(self.source.next())
+            except StopIteration:
+                break   #...but if we have a partial batch, return it.
+        return ret
 
 # Because itertools returns the same thing more than once.
 class MaskIterator:
@@ -219,6 +238,7 @@ class DTIterator:
             self.crossings += 1
             self.sub = FixedDTIterator(crossings)
             return self.sub.next()
+        
 
 # A simple generator for all manifolds in OrientableCuspedCensus,
 # LinkExteriors, HTLinkExteriors
@@ -276,11 +296,11 @@ def pqs_in_range(dehn_pq_limit):
     return pqs
 
 class DehnFillIterator:
-    def __init__(self, full_dehn_pq_limit = 24, already_done_manifolds_up_to = 0):
+    def __init__(self, source, full_dehn_pq_limit = 24, already_done_manifolds_up_to = 0):
         self.all_pqs = pqs_in_range(full_dehn_pq_limit)
         pqlen = len(self.all_pqs)
         self.mnum = 0
-        self.pulling_from = SimpleIterator()
+        self.pulling_from = source
         for i in range(0, already_done_manifolds_up_to):
             self.pulling_from.next()
         self.current_manifold = self.pulling_from.next()

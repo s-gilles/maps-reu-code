@@ -15,7 +15,7 @@ class LastIterator:
         return self
 
     def last(self):
-        return self.last    
+        return self.last
 
     def next(self, default = None):
         self.last = self.it.next(default = default)
@@ -40,7 +40,7 @@ class MaskIterator:
             # produce output
             out = [False]*self.length
             while True:
-                try:            
+                try:
                     for i in self.switches.next():
                         out[i] = True
                     break
@@ -55,22 +55,22 @@ class MaskIterator:
                         else:
                             return default
             return out
-            
+
     def reset(self):
         self.ctrue = 0
         self.switches = iter([[]])
 
 class FixedTorusBundleIterator:
-    
+
     def __init__(self,simplices,start=None):
         self.l = simplices
         self.src = MaskIterator(simplices)
         if start is not None:
-# Trouble is, it's not obvious how snappy wants these specified, 
+# Trouble is, it's not obvious how snappy wants these specified,
 # and moreover, some redundancy is certainly present.
 # So the only reliable way I can see is to iterate directly.
 # Partial implementation left in case this is later resolved.
-# Sorry :( 
+# Sorry :(
 #            try:
 #                nm = start.name()
 #                # Reverse the string construction that gave this manifold.
@@ -81,15 +81,15 @@ class FixedTorusBundleIterator:
 #                    raise ValueError
 #                for idx in xrange(len(nm[4:])):
 #                    if ch is 'L':
-#                        targ[idx+1] = 
+#                        targ[idx+1] =
 #                for b in self.src:
             try:
                 while self.next() is not start:
                     pass
                 except StopIteration:
-                    print 'Warning: tried to start iterator with non-output '+start.name()+'.' 
+                    print 'Warning: tried to start iterator with non-output '+start.name()+'.'
                     self.src.reset()    # Act as if start = None
-                
+
 
     def __iter__(self):
         return self
@@ -115,12 +115,12 @@ class FixedTorusBundleIterator:
         return Manifold(ostr)
 
 class TorusBundleIterator:
-    def __init__(self, start=2): # start may be int (number of simplices) or manifold        
+    def __init__(self, start=2): # start may be int (number of simplices) or manifold
         if isinstance(start, Manifold):
             self.l = len(start.name()) - 3)
             self.src = FixedTorusBundleIterator(self.l,start=start)
         elif not isinstance(start, int):
-            print 'Warning: tried to start a manifold iterator at '+str(start)+'.'           
+            print 'Warning: tried to start a manifold iterator at '+str(start)+'.'
             start = 2
         if isinstance(start, int):
             self.l = start
@@ -153,7 +153,7 @@ class FixedDTIterator:
         self.sgn_perms = MaskIterator(self.n,self.n//2)  # mirrors don't count
         # In case they want us to start:
         if start is not None:
-            try:            
+            try:
                 while start is not self.next():
                     pass
             except StopIteration:
@@ -188,7 +188,7 @@ class FixedDTIterator:
                 # Chuck in a loop that catches relevant exceptions...
             except AttributeError, ValueError:
                 continue
-            
+
 class DTIterator:
     def __init__(self,start=None):
         self.crossings = 3
@@ -197,7 +197,7 @@ class DTIterator:
 
     def __iter__(self):
         return self
-    
+
     def next(self, default = None):
         try:
             return sub.next()

@@ -152,6 +152,8 @@ def merge_up_dict(local_dict):
                 fulls_manifolds = fulls_polydict.setdefault(vol, list())
                 fulls_manifolds.extend(manifold_records)
 
+# The action that a worker thread takes.  Simply read from the Queue and
+# perform computations.
 def compute_shape_fields(idx):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     local_dict = dict()
@@ -247,6 +249,8 @@ def compute_shape_fields(idx):
 
     return
 
+# Wrapper around compute_shape_fields, in case any one-time startup/shutdown
+# code needs to be applied.
 def worker_action(idx):
     snap_process[idx] = kickoff_snap()
     compute_shape_fields(idx)
@@ -298,6 +302,11 @@ if __name__ == "__main__":
             time.sleep(0.1)
         worker_threads.append(new_thread)
 
+    # To trigger these, find the PID and issue
+    #
+    #     kill -s SIGUSR1 $PID
+    #
+    # or such.
     signal.signal(signal.SIGINT, sigint_handler)
     signal.signal(signal.SIGUSR1, sigusr1_handler)
     signal.signal(signal.SIGUSR2, sigusr2_handler)

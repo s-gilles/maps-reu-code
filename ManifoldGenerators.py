@@ -189,10 +189,11 @@ class FixedDTIterator:
                     if self.sgn_curr[i]:
                         self.abs_curr[i] = self.abs_curr[i] * -1
                 print 'DT:['+str(self.abs_curr)+']' # DEBUG
-                return Manifold('DT:['+str(self.abs_curr)+']')  # HERE fix formatting
+                return Manifold('DT:[('+str(self.abs_curr).replace(' ','').strip('[]')+')]')  # HERE fix formatting
                 # Looks like this fails randomly according to unexplained constraints
                 # Chuck in a loop that catches relevant exceptions...
             except AttributeError, ValueError:
+                print 'Failed: \'DT:[('+str(self.abs_curr).replace(' ','').strip('[]')+')]\'.'
                 continue
 
 class DTIterator:

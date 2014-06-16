@@ -9,17 +9,17 @@ from itertools import permutations
 class LastIterator:
     def __init__(self,iterator):
         self.it = iterator
-        self.last = None
+        self.last_item = None
 
     def __iter__(self):
         return self
 
     def last(self):
-        return self.last
+        return self.last_item
 
     def next(self, default = None):
         self.last = self.it.next(default = default)
-        return self.last
+        return self.last_item
 
 # Because itertools returns the same thing more than once.
 class MaskIterator:
@@ -35,7 +35,7 @@ class MaskIterator:
     def __iter__(self):
         return self
 
-    # Gives all lists of self.length with boolean values with up to self.max_true Trues 
+    # Gives all lists of self.length with boolean values with up to self.max_true Trues
     def next(self, default = None):
             # produce output
             out = [False]*self.length
@@ -215,7 +215,7 @@ class DTIterator:
 
 # A simple generator for all manifolds in OrientableCuspedCensus,
 # LinkExteriors, HTLinkExteriors
-class SimpleGenerator:
+class SimpleIterator:
     mnum = 0
     pulling_from = None
     pulling_from_str = None
@@ -260,41 +260,45 @@ class SimpleGenerator:
             pass
         return ret
 
-class DehnFillGenerator:
-    all_pqs = None
-    pqs_for_already_seen_range = None
-    already_seen_mnum = 0
-    mnum = 0
-    pq_iter = None
+def pqs_in_range(dehn_pq_limit):
+    pqs = list()
+    for p in range(-1 * dehn_pq_limit, dehn_pq_limit):
+        for q in range(0, dehn_pq_limit):
+            if abs(gcd(p,q)) is 1:
+                pqs.append((p,q))
+    return pqs
 
-    def pqs_in_range(dehn_pq_limit):
-        pqs = list()
-        for p in range(-1 * dehn_pq_limit, dehn_pq_limit):
-            for q in range(0, dehn_pq_limit):
-                if abs(gcd(p,q)) is 1:
-                    pqs.append((p,q))
-        return pqs
-
+class DehnFillIterator:
     def __init__(self, full_dehn_pq_limit = 24, already_done_manifolds_up_to = 0):
         self.all_pqs = pqs_in_range(full_dehn_pq_limit)
         pqlen = len(self.all_pqs)
         self.mnum = 0
-        self.pulling_from = SimpleGenerator()
+        self.pulling_from = SimpleIterator()
         for i in range(0, already_done_manifolds_up_to):
             self.pulling_from.next()
         self.current_manifold = self.pulling_from.next()
-        pq_iter = iter(all_pqs)
+        self.pq_iter = iter(self.all_pqs)
 
     def next(self):
         while True:
             try:
-                p, q = pq_iter.next()
+                p, q = self.pq_iter.next()
                 m = self.current_manifold.copy()
                 m.dehn_fill((p,q))
                 return m
             except StopIteration:
-                try:
-                    self.current_manifold = self.pulling_from.next()
-                    pq_iter = iter(all_pqs)
-                except StopIteration:
-                    raise StopIteration
+                self.current_manifold = self.pulling_from.next()
+                self.pq_iter = iter(self.all_pqs)
+
+    def next_batch(self, batch_size):
+        ret = list()
+
+        # This is awkward because we want to completely exhaust before raising
+        # exception
+        ret.append(self.next())
+        try:
+            for i in range(1, batch_size):
+                ret.append(self.next())
+        except:
+            pass
+        return ret

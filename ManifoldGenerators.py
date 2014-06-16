@@ -86,38 +86,44 @@ class FixedTorusBundleIterator:
             try:
                 while self.next() is not start:
                     pass
-                except StopIteration:
-                    print 'Warning: tried to start iterator with non-output '+start.name()+'.'
-                    self.src.reset()    # Act as if start = None
+            except StopIteration:
+                print 'Warning: tried to start iterator with non-output '+start.name()+'.'
+                self.src.reset()    # Act as if start = None
 
 
     def __iter__(self):
         return self
 
     def next(self, default = None):
-        try:
-            bstr = self.src.next()
-        except StopIteration:
-            if default is not None:
-                return default
-            else:
-                raise StopIteration
-        ostr = 'bo'
-        if bstr[0]:
-            ostr += '-R'
-        else:
-            ostr += '+R'
-        for v in bstr:
-            if v:
-                ostr += 'L'
-            else:
-                ostr += 'R'
-        return Manifold(ostr)
+        while True:
+            try:
+                try:
+                    bstr = self.src.next()
+                except StopIteration:
+                    if default is not None:
+                        return default
+                    else:
+                        raise StopIteration
+                ostr = 'bo'
+                if bstr[0]:
+                    ostr += '-R'
+                else:
+                    ostr += '+R'
+                for v in bstr:
+                    if v:
+                        ostr += 'L'
+                    else:
+                        ostr += 'R'
+                out = Manifold(ostr)
+                break
+            except (IOError, AttributeError, ValueError): # In the rare case the string was invalid.
+                continue
+        return out
 
 class TorusBundleIterator:
     def __init__(self, start=2): # start may be int (number of simplices) or manifold
         if isinstance(start, Manifold):
-            self.l = len(start.name()) - 3)
+            self.l = len(start.name()) - 3
             self.src = FixedTorusBundleIterator(self.l,start=start)
         elif not isinstance(start, int):
             print 'Warning: tried to start a manifold iterator at '+str(start)+'.'
@@ -132,7 +138,7 @@ class TorusBundleIterator:
     def next(self, default = None):
         while True:
             try:
-                return selfsrc.next()
+                return self.src.next()
             except StopIteration:
                 self.l += 1
                 self.src = FixedTorusBundleIterator(self.l)

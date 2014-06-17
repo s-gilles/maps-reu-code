@@ -29,10 +29,11 @@ SIG_FINISH = 1
 SIG_DIE = 2
 SIG_MERGE = 3
 
-ACT_DIE = 10
-ACT_CENSUS = 11
-ACT_DEHN = 12
-ACT_COLLECT = 19
+ACT_CENSUS = 10
+ACT_COLLECT = 11
+ACT_COLLECT_THEN_DIE = 12
+ACT_DEHN = 13
+ACT_DIE = 14
 main_action = ACT_DEHN
 last_action = None
 
@@ -317,7 +318,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGUSR2, sigusr2_handler)
 
     simple_iterator = ManifoldIterators.SimpleIterator()
-    dehn_fill_iterator = ManifoldIterators.DehnFillIterator()
+    dehn_fill_iterator = ManifoldIterators.DehnFillIterator(ManifoldIterators.SimpleIterator())
 
     print('Working...')
 
@@ -338,6 +339,10 @@ if __name__ == "__main__":
             main_action = last_action
             last_action = None
             continue
+        elif main_action is ACT_COLLECT_THEN_DIE:
+            for i in range(0, THREAD_NUM):
+                ready_manifolds.put((None, SIG_FINISH))
+            break
         elif main_action is ACT_CENSUS:
             try:
                 for m in simple_iterator.next_batch(CENSUS_CHUNK_SIZE):
@@ -351,7 +356,7 @@ if __name__ == "__main__":
                     ready_manifolds.put((m, None))
             except:
                 print('Done with dehn fillings.')
-                break
+                main_action = ACT_COLLECT_THEN_DIE
 
         # Would like to .join() here, but must use sleep() for signaling, or
         # some hogwash

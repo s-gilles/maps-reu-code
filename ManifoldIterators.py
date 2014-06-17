@@ -3,7 +3,7 @@
 from snappy import *
 from snappy.database import OrientableCuspedCensus, HTLinkExteriors, LinkExteriors
 from fractions import gcd
-from itertools import permutations
+from itertools import permutations, product
 
 # Adds a cache to an iterator that makes it remember the last value sent.
 class LastIterator:
@@ -26,7 +26,7 @@ class LastIterator:
             else:
                 raise
         return self.last_item
-            
+
 # Generalized ability to grab a batch from an iterator 'source'.
 class BatchIterator:
     def __init__(self,source,batch_size):
@@ -36,9 +36,9 @@ class BatchIterator:
     def next(self):
             return self.source.next()
 
-    def next_batch(self, batch_size = -1):  # Default value that indicates preset batch_size.       
+    def next_batch(self, batch_size = -1):  # Default value that indicates preset batch_size.
         if batch_size <= 0:
-            batch_size = self.def_batch_size        
+            batch_size = self.def_batch_size
         ret = [self.source.next()]   # Raise StopIteration if nothing to return at all.
         for i in xrange(batch_size - 1):
             try:
@@ -238,7 +238,6 @@ class DTIterator:
             self.crossings += 1
             self.sub = FixedDTIterator(crossings)
             return self.sub.next()
-        
 
 # A simple generator for all manifolds in OrientableCuspedCensus,
 # LinkExteriors, HTLinkExteriors
@@ -287,34 +286,49 @@ class SimpleIterator:
             pass
         return ret
 
-def pqs_in_range(dehn_pq_limit):
+def pqs_in_range(dehn_pq_limit, num_cusps):
+
+    # pqs = [ None, (0,0), (0,1), (0,3), (5,12), (9,13), ... ]
     pqs = list()
     for p in range(-1 * dehn_pq_limit, dehn_pq_limit):
         for q in range(0, dehn_pq_limit):
-            if abs(gcd(p,q)) is 1:
+            if abs(gcd(p,q)) <= 1:
                 pqs.append((p,q))
-    return pqs
+    pqs.append(None)
+
+    # pqs_mult = [ pqs, pqs, pqs... ]
+    # because we wish to return pqs x pqs x pqs ... x pqs
+    pqs_mult = list()
+    for i in range(0, num_cusps):
+        pqs_mult.append(pqs)
+    return product(*pqs_mult)
 
 class DehnFillIterator:
     def __init__(self, source, full_dehn_pq_limit = 24, already_done_manifolds_up_to = 0):
-        self.all_pqs = pqs_in_range(full_dehn_pq_limit)
-        pqlen = len(self.all_pqs)
         self.mnum = 0
         self.pulling_from = source
         for i in range(0, already_done_manifolds_up_to):
             self.pulling_from.next()
         self.current_manifold = self.pulling_from.next()
+        self.all_pqs = pqs_in_range(full_dehn_pq_limit, self.current_manifold.num_cusps())
         self.pq_iter = iter(self.all_pqs)
+        self.dehn_pq_limit = full_dehn_pq_limit
 
     def next(self):
         while True:
             try:
-                p, q = self.pq_iter.next()
+                pqs = self.pq_iter.next()
                 m = self.current_manifold.copy()
-                m.dehn_fill((p,q))
+
+                curr_idx = 0
+                for curr_pq in pqs:
+                    if curr_pq is not None:
+                        m.dehn_fill(curr_pq, curr_idx)
+                    curr_idx = curr_idx + 1
                 return m
             except StopIteration:
                 self.current_manifold = self.pulling_from.next()
+                self.all_pqs = pqs_in_range(self.dehn_pq_limit, self.current_manifold.num_cusps())
                 self.pq_iter = iter(self.all_pqs)
 
     def next_batch(self, batch_size):

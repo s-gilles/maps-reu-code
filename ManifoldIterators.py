@@ -29,7 +29,7 @@ class QueueIterator:
         if index < 0:
             index = 0
         elif index > len(self.sources):
-            index = len(self.sources):
+            index = len(self.sources)
         self.sources.insert(source,index)
 
     # Removes and returns a source
@@ -281,7 +281,7 @@ class DTIterator:
 
     def next(self, default = None):
         try:
-            return sub.next()
+            return self.sub.next()
         except StopIteration:
             self.crossings += 1
             self.sub = FixedDTIterator(crossings)

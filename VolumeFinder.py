@@ -169,7 +169,7 @@ def compute_shape_fields(idx):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     global snap_process
     local_dict = dict()
-    fname = 'tmp' + str(idx) + '.trig'
+    fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
     snap_output = ''
     while True:
 
@@ -280,9 +280,6 @@ def sigint_handler(signum, frame):
 
 def sigusr2_handler(sig, frame):
     global main_action
-    global last_action
-    if last_action is None:
-        last_action = main_action
     main_action = ACT_COLLECT
     print('Writing out current progress. Please wait.')
 
@@ -302,6 +299,12 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_locals)
 
 def beginCollection(iterator, output_filename = 'output.csv'):
+    """Call this, given a batch iterator, to exhaust that batch iterator and
+store the result to output_filename.  Example:
+
+  beginCollection(BatchIterator(TorusBundleIterator), 50)
+
+will set up the default thread state."""
     global THREAD_NUM
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
@@ -355,10 +358,9 @@ def beginCollection(iterator, output_filename = 'output.csv'):
                 ready_manifolds.put((None, SIG_MERGE))
             while not ready_manifolds.empty():
                 time.sleep(0.05)
-            write_dict_to_output()
+            write_dict_to_output(output_filename)
             print('Wrote out current progress.')
-            main_action = last_action
-            last_action = None
+            main_action = ACT_DISTRUBUTE_WORK
             continue
         elif main_action is ACT_COLLECT_THEN_DIE:
             for i in range(0, THREAD_NUM):

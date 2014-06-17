@@ -29,15 +29,11 @@ SIG_FINISH = 1
 SIG_DIE = 2
 SIG_MERGE = 3
 
-ACT_CENSUS = 10
+ACT_DISTRUBUTE_WORK = 10
 ACT_COLLECT = 11
 ACT_COLLECT_THEN_DIE = 12
-ACT_DEHN = 13
 ACT_DIE = 14
-ACT_DOWKER_THISTLEWAITE = 15
-ACT_TORUS_BUNDLE = 16
-main_action = ACT_DEHN
-last_action = None
+main_action = ACT_DISTRUBUTE_WORK
 
 RE_INV_TRACE_FIELD_NOT_FOUND = re.compile('.*Invariant trace field not found.*', re.DOTALL)
 RE_FUNC_REQ_GROUP = re.compile('.*Function requires a group.*', re.DOTALL)
@@ -72,8 +68,8 @@ ready_manifolds = Queue.Queue()
 full_list = dict()
 full_list_lock = threading.Lock()
 
-def write_dict_to_output():
-    f = open('output.csv', 'w')
+def write_dict_to_output(output_filename = 'output.csv'):
+    f = open(output_filename, 'w')
     f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
     for poly,data in sorted(full_list.items()):
         dm = re.match('x\^([0-9]+).*', poly)
@@ -171,6 +167,7 @@ def merge_up_dict(local_dict):
 # perform computations.
 def compute_shape_fields(idx):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
+    global snap_process
     local_dict = dict()
     fname = 'tmp' + str(idx) + '.trig'
     snap_output = ''
@@ -290,9 +287,6 @@ def sigusr2_handler(sig, frame):
     print('Writing out current progress. Please wait.')
 
 def sigusr1_handler(sig, frame):
-    """Interrupt running process, and provide a python prompt for
-    interactive debugging."""
-
     id2name = dict([(th.ident, th.name) for th in threading.enumerate()])
     code = []
     for threadId, stack in sys._current_frames().items():
@@ -307,8 +301,25 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_globals)  # Unless shadowed by global
     d.update(frame.f_locals)
 
+def beginCollection(iterator, output_filename = 'output.csv'):
+    global THREAD_NUM
+    global CENSUS_CHUNK_SIZE
+    global SNAP_PATH
+    global TRIG_PATH
+    
+    global SIG_FINISH
+    global SIG_DIE
+    global SIG_MERGE
 
-if __name__ == "__main__":
+    global ACT_DISTRUBUTE_WORK
+    global ACT_COLLECT
+    global ACT_COLLECT_THEN_DIE 
+    global ACT_DIE
+    global main_action
+    global snap_process
+
+    pari.set_real_precision(100)
+
     # Fiddle about with waiting for workers to startup
     print('Initializing...')
     worker_threads = list()
@@ -329,16 +340,10 @@ if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, sigusr1_handler)
     signal.signal(signal.SIGUSR2, sigusr2_handler)
 
-    simple_iterator = BatchIterator(SimpleIterator(), CENSUS_CHUNK_SIZE)
-    dehn_fill_iterator = BatchIterator(DehnFillIterator(ManifoldIterators.SimpleIterator(),
-                                                        18),
-                                       CENSUS_CHUNK_SIZE)
-    dowker_thistlethwaite_iterator = BatchIterator(DTIterator())
-    torus_bundle_iterator = BatchIterator(TorusBundleIterator())
-
     print('Working...')
 
     while True:
+        signal.signal(signal.SIGINT, sigint_handler)
         if main_action is ACT_DIE:
             with ready_manifolds.mutex:
                 ready_manifolds.queue.clear()
@@ -359,33 +364,12 @@ if __name__ == "__main__":
             for i in range(0, THREAD_NUM):
                 ready_manifolds.put((None, SIG_FINISH))
             break
-        elif main_action is ACT_CENSUS:
+        elif main_action is ACT_DISTRUBUTE_WORK:
             try:
-                for m in simple_iterator.next_batch():
+                for m in iterator.next_batch():
                     ready_manifolds.put((m, None))
-            except:
-                print('Done with basic census.')
-                main_action = ACT_DEHN
-        elif main_action is ACT_DEHN:
-            try:
-                for m in dehn_fill_iterator.next_batch():
-                    ready_manifolds.put((m, None))
-            except:
-                print('Done with Dehn fillings.')
-                main_action = ACT_COLLECT_THEN_DIE
-        elif main_action is ACT_DOWKER_THISTLEWAITE:
-            try:
-                for m in dowker_thistlethwaite_iterator.next_batch():
-                    ready_manifolds.put((m, None))
-            except:
-                print('Done with Dowker-Thistlewaite codes')
-                main_action = ACT_COLLECT_THEN_DIE
-        elif main_action is ACT_TORUS_BUNDLE:
-            try:
-                for m in torus_bundle_iterator.next_batch():
-                    ready_manifolds.put((m, None))
-            except:
-                print('Done with Torus Bundles')
+            except StopIteration:
+                print('Done.')
                 main_action = ACT_COLLECT_THEN_DIE
 
         # Would like to .join() here, but must use sleep() for signaling, or
@@ -397,4 +381,4 @@ if __name__ == "__main__":
     while any(w.is_alive() for w in worker_threads):
         time.sleep(0.05)
 
-    write_dict_to_output()
+    write_dict_to_output(output_filename)

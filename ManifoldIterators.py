@@ -226,7 +226,7 @@ class FixedDTIterator:
         self.n = crossings
         # self.k = components   # Not yet
         m = list()
-        for i in xrange(2*crossings):
+        for i in xrange(crossings):
             m.append(2*(i))
         self.abs_perms = permutations(m,self.n)
         self.abs_curr = list(self.abs_perms.next())

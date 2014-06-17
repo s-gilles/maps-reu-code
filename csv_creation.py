@@ -3,7 +3,7 @@
 from __future__ import print_function
 from snappy import *
 from cypari import *
-import ManifoldIterators
+from ManifoldIterators import *
 import Queue
 import code
 import errno
@@ -20,7 +20,7 @@ import time
 import traceback
 
 # `configuration' variables between runs/machines
-THREAD_NUM = 8
+THREAD_NUM = 12
 CENSUS_CHUNK_SIZE = 50
 SNAP_PATH='/usr/local/bin/snap'
 TRIG_PATH='./triangulations/linkexteriors'
@@ -34,6 +34,8 @@ ACT_COLLECT = 11
 ACT_COLLECT_THEN_DIE = 12
 ACT_DEHN = 13
 ACT_DIE = 14
+ACT_DOWKER_THISTLEWAITE = 15
+ACT_TORUS_BUNDLE = 16
 main_action = ACT_DEHN
 last_action = None
 
@@ -275,7 +277,7 @@ def double_sigint_handler(signum, frame):
 
 def sigint_handler(signum, frame):
     global main_action
-    main_action = ACT_DIE
+    main_action = ACT_COLLECT_THEN_DIE
     print('\nDying. Please wait for worker threads to terminate. (^C again REALLY kills)')
     signal.signal(signal.SIGINT, double_sigint_handler)
 
@@ -327,8 +329,12 @@ if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, sigusr1_handler)
     signal.signal(signal.SIGUSR2, sigusr2_handler)
 
-    simple_iterator = ManifoldIterators.SimpleIterator()
-    dehn_fill_iterator = ManifoldIterators.DehnFillIterator(ManifoldIterators.SimpleIterator())
+    simple_iterator = BatchIterator(SimpleIterator(), CENSUS_CHUNK_SIZE)
+    dehn_fill_iterator = BatchIterator(DehnFillIterator(ManifoldIterators.SimpleIterator(),
+                                                        18),
+                                       CENSUS_CHUNK_SIZE)
+    dowker_thistlethwaite_iterator = BatchIterator(DTIterator())
+    torus_bundle_iterator = BatchIterator(TorusBundleIterator())
 
     print('Working...')
 
@@ -355,17 +361,31 @@ if __name__ == "__main__":
             break
         elif main_action is ACT_CENSUS:
             try:
-                for m in simple_iterator.next_batch(CENSUS_CHUNK_SIZE):
+                for m in simple_iterator.next_batch():
                     ready_manifolds.put((m, None))
             except:
                 print('Done with basic census.')
                 main_action = ACT_DEHN
         elif main_action is ACT_DEHN:
             try:
-                for m in dehn_fill_iterator.next_batch(CENSUS_CHUNK_SIZE):
+                for m in dehn_fill_iterator.next_batch():
                     ready_manifolds.put((m, None))
             except:
-                print('Done with dehn fillings.')
+                print('Done with Dehn fillings.')
+                main_action = ACT_COLLECT_THEN_DIE
+        elif main_action is ACT_DOWKER_THISTLEWAITE:
+            try:
+                for m in dowker_thistlethwaite_iterator.next_batch():
+                    ready_manifolds.put((m, None))
+            except:
+                print('Done with Dowker-Thistlewaite codes')
+                main_action = ACT_COLLECT_THEN_DIE
+        elif main_action is ACT_TORUS_BUNDLE:
+            try:
+                for m in torus_bundle_iterator.next_batch():
+                    ready_manifolds.put((m, None))
+            except:
+                print('Done with Torus Bundles')
                 main_action = ACT_COLLECT_THEN_DIE
 
         # Would like to .join() here, but must use sleep() for signaling, or

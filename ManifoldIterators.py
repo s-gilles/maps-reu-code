@@ -61,7 +61,8 @@ class MaskIterator:
     def __iter__(self):
         return self
 
-    # Gives all lists of self.length with boolean values with up to self.max_true Trues
+    # Gives all lists of self.length with boolean values with up to
+    # self.max_true Trues
     def next(self, default = None):
             # produce output
             out = [False]*self.length
@@ -171,9 +172,10 @@ class TorusBundleIterator:
                 continue
 
 class FixedDTIterator:
-    # Set start to a manifold this iterator will later output, and the iterator will skip to right after it.
-    # That way, you can mark a place to return to more efficently.
-    # Or it will be more efficent if I bother to parse mask and abs seperately; won't unless this wastes too much time.
+    # Set start to a manifold this iterator will later output, and the iterator
+    # will skip to right after it.  That way, you can mark a place to return to
+    # more efficently.  Or it will be more efficent if I bother to parse mask
+    # and abs seperately; won't unless this wastes too much time.
     def __init__(self,crossings,start=None):
         self.n = crossings
         # self.k = components   # Not yet
@@ -242,10 +244,6 @@ class DTIterator:
 # A simple generator for all manifolds in OrientableCuspedCensus,
 # LinkExteriors, HTLinkExteriors
 class SimpleIterator:
-    mnum = 0
-    pulling_from = None
-    pulling_from_str = None
-
     def __init__(self, already_seen_mnum = 0):
         self.mnum = 0
         self.pulling_from = iter(OrientableCuspedCensus)
@@ -272,19 +270,6 @@ class SimpleIterator:
                 else:
                     self.pulling_from = None
                 continue
-
-    def next_batch(self, batch_size):
-        ret = list()
-
-        # This is awkward because we want to completely exhaust before raising
-        # exception
-        ret.append(self.next())
-        try:
-            for i in range(1, batch_size):
-                ret.append(self.next())
-        except:
-            pass
-        return ret
 
 def pqs_in_range(dehn_pq_limit, num_cusps):
 
@@ -330,16 +315,3 @@ class DehnFillIterator:
                 self.current_manifold = self.pulling_from.next()
                 self.all_pqs = pqs_in_range(self.dehn_pq_limit, self.current_manifold.num_cusps())
                 self.pq_iter = iter(self.all_pqs)
-
-    def next_batch(self, batch_size):
-        ret = list()
-
-        # This is awkward because we want to completely exhaust before raising
-        # exception
-        ret.append(self.next())
-        try:
-            for i in range(1, batch_size):
-                ret.append(self.next())
-        except:
-            pass
-        return ret

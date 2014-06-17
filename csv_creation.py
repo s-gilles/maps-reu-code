@@ -72,13 +72,22 @@ full_list_lock = threading.Lock()
 
 def write_dict_to_output():
     f = open('output.csv', 'w')
-    f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc\n')
+    f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
     for poly,data in sorted(full_list.items()):
         dm = re.match('x\^([0-9]+).*', poly)
         deg = '0'
         if dm is not None:
             deg = dm.group(1)
-        disc = str(pari(poly).nfdisc())
+        disc = pari(poly).nfdisc()
+        disc_str = str(disc)
+        disc_fact_str = ''
+        try:
+            for p, e in disc.factor().mattranspose():
+                disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
+            disc_fact_str = disc_fact_str[:-1]
+        except ValueError:
+            disc_fact_str = disc_str
+
         for vol, l in sorted(data.items()):
             for rec in l:
                 #unpack tuples
@@ -92,7 +101,8 @@ def write_dict_to_output():
                 f.write('"' + deg + '",')
                 f.write('"' + rec[2] + '",')
                 f.write('"' + str(rec[1]) + '",')
-                f.write('"' + disc + '"\n')
+                f.write('"' + disc_str + '",')
+                f.write('"' + disc_fact_str + '"\n')
     f.close()
 
 def drain(out):

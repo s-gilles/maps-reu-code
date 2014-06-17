@@ -251,7 +251,7 @@ class FixedDTIterator:
                     self.sgn_curr = list(self.sgn_perms.next())
                 except StopIteration:
                     try:
-                        self.abs_curr = list(abs_perms.next())
+                        self.abs_curr = list(self.abs_perms.next())
                     except StopIteration:
                         if default is None:
                             raise StopIteration

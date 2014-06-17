@@ -29,7 +29,7 @@ class QueueIterator:
         if index < 0:
             index = 0
         elif index > len(self.sources):
-            index = len(self.sources):
+            index = len(self.sources)
         self.sources.insert(source,index)
 
     # Removes and returns a source

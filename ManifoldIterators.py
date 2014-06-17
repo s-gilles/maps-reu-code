@@ -5,6 +5,52 @@ from snappy.database import OrientableCuspedCensus, HTLinkExteriors, LinkExterio
 from fractions import gcd
 from itertools import permutations, product
 
+# Iterates through each element of 'sources' in order.
+class QueueIterator:
+    def __init__(self,sources):
+        self.sources = sources
+        self.finished = list()
+    
+    def __iter__(self):
+        return self
+
+    def next(self):
+        while True:
+            try:
+                return self.sources[0].next()
+            except StopIteration:
+                self.finished.append(self.sources.pop(0))
+                continue
+            except IndexError: # Out of stuff to return
+                raise StopIteration
+
+    # Adds the source at the given index, bumping everything back
+    def add(source, index):
+        if index < 0:
+            index = 0
+        elif index > len(self.sources):
+            index = len(self.sources):
+        self.sources.insert(source,index)
+
+    # Removes and returns a source
+    def pop(index):
+        try:
+            return self.sources.pop(index)
+        except IndexError:
+            pass
+
+    # You could modify the list, but please don't.
+    def peek():
+        return self.sources
+
+    # Lets you see the current iterator
+    def current():
+        return self.sources[0]    
+
+    # A list of iterators we went through.
+    def finished():
+        return self.finished
+
 # Adds a cache to an iterator that makes it remember the last value sent.
 class LastIterator:
     def __init__(self,iterator):

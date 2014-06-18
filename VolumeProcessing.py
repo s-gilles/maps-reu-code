@@ -80,17 +80,21 @@ def read_raw_csv(in_file):
 def write_csv(out_file, dataset, append=False):
     if not append:
         out_file.write('InvariantTraceField,Root,Volume,InvariantTraceFieldDegree,NumberOfComplexPlaces,Disc,Factored,Name,Tetrahedra\n')
-    for p in dataset.get_polys():
+    for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
         for r in dataset.get_roots(p):
+            deg = dataset.get_degree(p)
+            ncp = dataset.get_ncp(p)
+            disc = dataset.get_disc(p)
+            fact_disc = dataset.get_factored_disc(p)
             for v in dataset.get_volumes(p,r):
                 for m in dataset.get_manifold_data(p,r,v):
                     out_file.write('"'+p+'",')
                     out_file.write('"'+r+'",')
                     out_file.write('"'+v+'",')
-                    out_file.write('"'+dataset.get_degree(p)+'",')
-                    out_file.write('"'+dataset.get_ncp(p)+'",')
-                    out_file.write('"'+dataset.get_disc(p)+'",')
-                    out_file.write('"'+dataset.get_factored_disc(p)+'",')
+                    out_file.write('"'+deg+'",')
+                    out_file.write('"'+ncp+'",')
+                    out_file.write('"'+disc+'",')
+                    out_file.write('"'+fact_disc+'",')
                     out_file.write('"'+m[0]+'",')
                     out_file.write('"'+m[1]+'"\n')
 

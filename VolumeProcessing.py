@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import re
+
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
 
@@ -50,7 +52,8 @@ def read_raw_csv(in_file):
     for l in in_file.readlines():
             # To avoid breaking this, make sure to quote all data fields.
             # Second replace is a bit of a hack b/c first was failing unexpectedly
-            w = l.replace('\n','').strip('"').replace('","','$').split('$')
+            # w = l.replace('\n','').strip('"').replace('","','$').split('$')
+            w = re.findall('"([^"]*)"', l) # Revert if you wish, I'm concerned about unknown, weird manifold names with '$' in them
             # Incase the disc was 1, a temporary hack:
             if len(w) == 8:
                 w.append('')

@@ -20,7 +20,6 @@ import time
 import traceback
 
 # `configuration' variables between runs/machines
-THREAD_NUM = 12
 CENSUS_CHUNK_SIZE = 50
 SNAP_PATH='/usr/local/bin/snap'
 TRIG_PATH='./triangulations/linkexteriors'
@@ -46,7 +45,7 @@ pari.set_real_precision(100)
 
 # Each snap process is managed by one python thread.
 snap_process = [ ]
-for i in range(0, THREAD_NUM):
+for i in range(0, thread_num):
     snap_process.append(None)
 
 # Paired with snap process creation to prevent signal propagation
@@ -318,14 +317,14 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_globals)  # Unless shadowed by global
     d.update(frame.f_locals)
 
-def beginCollection(iterator, output_filename = 'output.csv'):
+def beginCollection(iterator, output_filename = 'output.csv', thread_num = 12):
     """Call this, given a batch iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
   beginCollection(BatchIterator(TorusBundleIterator), 50)
 
 will set up the default thread state."""
-    global THREAD_NUM
+    global thread_num
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
     global TRIG_PATH
@@ -346,7 +345,7 @@ will set up the default thread state."""
     # Fiddle about with waiting for workers to startup
     print('Initializing...')
     worker_threads = list()
-    for i in range(0, THREAD_NUM):
+    for i in range(0, thread_num):
         new_thread = threading.Thread(group = None, target = worker_action, args = (i,))
         new_thread.daemon = True
         new_thread.start()
@@ -372,14 +371,14 @@ will set up the default thread state."""
         if main_action is ACT_DIE:
             with ready_manifolds.mutex:
                 ready_manifolds.queue.clear()
-            for i in range(0, THREAD_NUM):
+            for i in range(0, thread_num):
                 ready_manifolds.put((None, SIG_DIE))
             break
         elif main_action is ACT_COLLECT:
             worker_to_main_messages.queue.clear()
-            for i in range(0, THREAD_NUM):
+            for i in range(0, thread_num):
                 ready_manifolds.put((None, SIG_MERGE))
-            for i in range(0, THREAD_NUM):
+            for i in range(0, thread_num):
                 worker_to_main_messages.get()
             write_dict_to_output(output_filename, not have_written_out_already)
             have_written_out_already = True
@@ -387,7 +386,7 @@ will set up the default thread state."""
             main_action = ACT_DISTRUBUTE_WORK
             continue
         elif main_action is ACT_COLLECT_THEN_DIE:
-            for i in range(0, THREAD_NUM):
+            for i in range(0, thread_num):
                 ready_manifolds.put((None, SIG_FINISH))
             break
         elif main_action is ACT_DISTRUBUTE_WORK:

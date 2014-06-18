@@ -55,6 +55,11 @@ def preexec_discard_signals():
 # may be done on them with snap
 ready_manifolds = Queue.Queue()
 
+# A thread-safe queue for distributing messages from the python threads to the
+# main thread. e.g. Main thread sends SIG_MERGE to all workers, wishes to know
+# when the merge actually occurs.
+worker_to_main_messages = Queue.Queue()
+
 # A list of all known hyperbolic volumes, organized by shape. The keys of this
 # dictionary are polynomials defining shape fields (e.g. x^2 - x + 1), and the
 # elements are lists of dictionaries. THESE dictionaries hav keys of hyperbolic
@@ -68,40 +73,47 @@ ready_manifolds = Queue.Queue()
 full_list = dict()
 full_list_lock = threading.Lock()
 
-def write_dict_to_output(output_filename = 'output.csv'):
-    f = open(output_filename, 'w')
-    f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
-    for poly,data in sorted(full_list.items()):
-        dm = re.match('x\^([0-9]+).*', poly)
-        deg = '0'
-        if dm is not None:
-            deg = dm.group(1)
-        disc = pari(poly).nfdisc()
-        disc_str = str(disc)
-        disc_fact_str = ''
-        try:
-            for p, e in disc.factor().mattranspose():
-                disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
-            disc_fact_str = disc_fact_str[:-1]
-        except ValueError:
-            disc_fact_str = disc_str
+def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
+    global full_list, full_list_lock
+    with full_list_lock:
+        if first_time:
+            f = open(output_filename, 'w')
+            f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
+        else:
+            f = open(output_filename, 'a')
 
-        for vol, l in sorted(data.items()):
-            for rec in l:
-                #unpack tuples
-                m = rec[0]
-                ncp = rec[1]
-                root = rec[2]
-                f.write('"' + str(m) + '",')
-                f.write('"' + str(m.num_tetrahedra()) + '",')
-                f.write('"' + vol + '",')
-                f.write('"' + poly + '",')
-                f.write('"' + deg + '",')
-                f.write('"' + rec[2] + '",')
-                f.write('"' + str(rec[1]) + '",')
-                f.write('"' + disc_str + '",')
-                f.write('"' + disc_fact_str + '"\n')
-    f.close()
+        for poly,data in sorted(full_list.items()):
+            dm = re.match('x\^([0-9]+).*', poly)
+            deg = '0'
+            if dm is not None:
+                deg = dm.group(1)
+            disc = pari(poly).nfdisc()
+            disc_str = str(disc)
+            disc_fact_str = ''
+            try:
+                for p, e in disc.factor().mattranspose():
+                    disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
+                disc_fact_str = disc_fact_str[:-1]
+            except ValueError:
+                disc_fact_str = disc_str
+
+            for vol, l in sorted(data.items()):
+                for rec in l:
+                    #unpack tuples
+                    m = rec[0]
+                    ncp = rec[1]
+                    root = rec[2]
+                    f.write('"' + str(m) + '",')
+                    f.write('"' + str(m.num_tetrahedra()) + '",')
+                    f.write('"' + vol + '",')
+                    f.write('"' + poly + '",')
+                    f.write('"' + deg + '",')
+                    f.write('"' + rec[2] + '",')
+                    f.write('"' + str(rec[1]) + '",')
+                    f.write('"' + disc_str + '",')
+                    f.write('"' + disc_fact_str + '"\n')
+        full_list = dict()
+        f.close()
 
 def drain(out):
     result = ''
@@ -168,6 +180,7 @@ def merge_up_dict(local_dict):
 def compute_shape_fields(idx):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     global snap_process
+    global worker_to_main_messages
     local_dict = dict()
     fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
     snap_output = ''
@@ -190,6 +203,7 @@ def compute_shape_fields(idx):
             merge_up_dict(local_dict)
             local_dict = dict()
             ready_manifolds.task_done()
+            worker_to_main_messages.put((SIG_MERGE,))
             continue
 
         if os.path.isfile(TRIG_PATH+"/"+str(manifold)+".trig"):
@@ -309,14 +323,14 @@ will set up the default thread state."""
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
     global TRIG_PATH
-    
+
     global SIG_FINISH
     global SIG_DIE
     global SIG_MERGE
 
     global ACT_DISTRUBUTE_WORK
     global ACT_COLLECT
-    global ACT_COLLECT_THEN_DIE 
+    global ACT_COLLECT_THEN_DIE
     global ACT_DIE
     global main_action
     global snap_process
@@ -333,6 +347,8 @@ will set up the default thread state."""
         while snap_process[i] is None:
             time.sleep(0.1)
         worker_threads.append(new_thread)
+
+    have_written_out_already = False
 
     # To trigger these, find the PID and issue
     #
@@ -354,11 +370,13 @@ will set up the default thread state."""
                 ready_manifolds.put((None, SIG_DIE))
             break
         elif main_action is ACT_COLLECT:
+            worker_to_main_messages.queue.clear()
             for i in range(0, THREAD_NUM):
                 ready_manifolds.put((None, SIG_MERGE))
-            while not ready_manifolds.empty():
-                time.sleep(0.05)
-            write_dict_to_output(output_filename)
+            for i in range(0, THREAD_NUM):
+                worker_to_main_messages.get()
+            write_dict_to_output(output_filename, not have_written_out_already)
+            have_written_out_already = True
             print('Wrote out current progress.')
             main_action = ACT_DISTRUBUTE_WORK
             continue
@@ -383,4 +401,4 @@ will set up the default thread state."""
     while any(w.is_alive() for w in worker_threads):
         time.sleep(0.05)
 
-    write_dict_to_output(output_filename)
+    write_dict_to_output(output_filename, not have_written_out_already)

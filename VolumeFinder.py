@@ -253,7 +253,7 @@ def compute_shape_fields(idx):
                 root = trace_match.group(3).strip()
                 if dm is not None:
                     degree = int(dm.group(1))
-                if degree <= 24:
+                if degree <= 8
                     by_poly = local_dict.setdefault(polynomial, dict())
                     by_volume = by_poly.setdefault(vol, list())
                     # All the information to be sent back from the threads is packed in a tuple:

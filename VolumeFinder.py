@@ -324,7 +324,6 @@ store the result to output_filename.  Example:
   beginCollection(BatchIterator(TorusBundleIterator), 50)
 
 will set up the default thread state."""
-    global thread_num
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
     global TRIG_PATH

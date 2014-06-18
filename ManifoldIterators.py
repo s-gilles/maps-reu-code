@@ -3,7 +3,7 @@
 from snappy import *
 from snappy.database import OrientableCuspedCensus, HTLinkExteriors, LinkExteriors
 from fractions import gcd
-from itertools import permutations, product
+from itertools import permutations, combinations, product
 
 # Iterates through each element of 'sources' in order.
 class QueueIterator:
@@ -120,7 +120,7 @@ class MaskIterator:
                 except StopIteration:
                     self.ctrue += 1
                     if self.ctrue <= self.max_true:
-                        self.switches = permutations(range(self.length),self.ctrue)
+                        self.switches = combinations(range(self.length),self.ctrue)
                         continue
                     else:
                         if default is None:

@@ -36,6 +36,12 @@ class dataset:
     def get_pared_manifolds(self,poly,root,vol):
         return self.data[poly][0][root][vol][1]
 
+    # Removes a volume, returning its manifold data
+    def remove_volume(self,poly,root,vol):
+        rec = self.data[poly][0][root].get(vol)
+        del self.data[poly][0][root][vol]
+        return rec
+
 # Load a CSV file organized by manifold and reorganize it by polynomial and volume.
 # The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra), list (pared manifolds)), degree etc.)
 def read_raw_csv(in_file):
@@ -85,6 +91,7 @@ def write_csv(out_file, dataset, append=False):
                     out_file.write('"'+m[0]+'",')
                     out_file.write('"'+m[1]+'"\n')
 
+# Removes redundant manifold records with the same trace field (and root) and volume
 def pare_all_volumes(data):
     for p in data.get_polys():
         for r in data.get_roots(p):
@@ -95,7 +102,37 @@ def pare_volume(data,poly,root,vol):
     mdata = data.get_manifold_data(poly,root,vol)
     mpared = data.get_pared_manifolds(poly,root,vol)
     while len(mdata) > 1:
-        mpared.append(mdata.pop(1)[0])          
+        mpared.append(mdata.pop(1)[0])
+
+# Removes volumes that are integer multiples of another volume 
+def cull_all_volumes(data):
+    for p in data.get_polys():
+        for r in data.get_roots(p):
+            cull_volumes(data,p,r)
+
+def cull_volumes(data,poly,root):
+    # vols = data.get_volumes(poly,root)
+    vols = data.data[poly][0][root].keys()
+    i = 0
+    while i < len(vols) - 1:
+        j = i + 1
+        while j < len(vols):
+            if is_int(float(vols[i])/float(vols[j])):
+                # [j] divides [i] so remove [i]
+                data.remove_volume(poly,root,vols[i])
+                # i is already effectivley incremented, so we must offset it
+                i = i-1
+                break
+            elif is_int(float(vols[j])/float(vols[i])):
+                # this time, remove [j]
+                data.remove_volume(poly,root,vols[j])
+                # j is effectivley incremented, no need to do it
+            else:
+                j += 1
+        i += 1
+
+def is_int(fl, epsilon = .0000000000001):
+    return fl % 1 < epsilon or 1 - (fl % 1) < epsilon 
 
 # Test code
 if __name__ == '__main__':
@@ -104,6 +141,7 @@ if __name__ == '__main__':
     d = read_raw_csv(f)
     f.close()
     pare_all_volumes(d)
+    cull_all_volumes(d)
     g = open('newoutput.csv','w')
     write_csv(g,d)
     g.close()

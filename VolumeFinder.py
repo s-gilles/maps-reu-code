@@ -68,9 +68,13 @@ ready_manifolds = Queue.Queue()
 full_list = dict()
 full_list_lock = threading.Lock()
 
-def write_dict_to_output(output_filename = 'output.csv'):
-    f = open(output_filename, 'w')
-    f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
+def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
+    if first_time:
+        f = open(output_filename, 'w')
+        f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
+    else
+        f = open(output_filename, 'a')
+
     for poly,data in sorted(full_list.items()):
         dm = re.match('x\^([0-9]+).*', poly)
         deg = '0'
@@ -309,14 +313,14 @@ will set up the default thread state."""
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
     global TRIG_PATH
-    
+
     global SIG_FINISH
     global SIG_DIE
     global SIG_MERGE
 
     global ACT_DISTRUBUTE_WORK
     global ACT_COLLECT
-    global ACT_COLLECT_THEN_DIE 
+    global ACT_COLLECT_THEN_DIE
     global ACT_DIE
     global main_action
     global snap_process
@@ -333,6 +337,8 @@ will set up the default thread state."""
         while snap_process[i] is None:
             time.sleep(0.1)
         worker_threads.append(new_thread)
+
+    have_written_out_already = False
 
     # To trigger these, find the PID and issue
     #
@@ -358,7 +364,8 @@ will set up the default thread state."""
                 ready_manifolds.put((None, SIG_MERGE))
             while not ready_manifolds.empty():
                 time.sleep(0.05)
-            write_dict_to_output(output_filename)
+            write_dict_to_output(output_filename, not have_written_out_already)
+            have_written_out_already = True
             print('Wrote out current progress.')
             main_action = ACT_DISTRUBUTE_WORK
             continue
@@ -383,4 +390,4 @@ will set up the default thread state."""
     while any(w.is_alive() for w in worker_threads):
         time.sleep(0.05)
 
-    write_dict_to_output(output_filename)
+    write_dict_to_output(output_filename, not have_written_out_already)

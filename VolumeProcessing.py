@@ -55,23 +55,24 @@ def read_raw_csv(in_file):
             # w = l.replace('\n','').strip('"').replace('","','$').split('$')
             w = re.findall('"([^"]*)"', l) # Revert if you wish, I'm concerned about unknown, weird manifold names with '$' in them
             # Incase the disc was 1, a temporary hack:
-            if len(w) == 8:
-                w.append('')
+            # if len(w) == 8:
+            #   w.append('')
             # w[0]: manifold name ---------------------------> m[0] for m in data[poly][0][root][vol][0]
             # w[1]: manifold simplices ----------------------> m[1] for m in data[poly][0][root][vol][0]
             # w[2]: volume ----------------------------------> v in data[poly][0][root].keys()
             # w[3]: invariant trace field polynomial --------> p in data.keys()
             # w[4]: polynomial degree -----------------------> data[poly][1]
             # w[5]: polynomial root -------------------------> r in data[poly][0].keys()
-            # w[6]: polynomial number of complex places -----> data[poly][2]
-            # w[7]: polynomial discriminant -----------------> data[poly][3]
-            # w[8]: polynomial discriminant (factorized) ----> data[poly][4]
+            # w[6]: manifold solution type ------------------> m[2] for m in data[poly][0][root][vol][0]
+            # w[7]: polynomial number of complex places -----> data[poly][2]
+            # w[8]: polynomial discriminant -----------------> data[poly][3]
+            # w[9]: polynomial discriminant (factorized) ----> data[poly][4]
             # vr = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[2],[list(),list(),w[5]])[0].append(w[0:2]) # OLD
             # # why was vr set just now and not used?
             vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
-            vol_entry[0].append((w[0],w[1]))
+            vol_entry[0].append((w[0],w[1],w[6]))
             if len(data[w[3]]) == 2:
-                data[w[3]].extend(w[6:9])
+                data[w[3]].extend(w[7:10])
             # print data[w[3]][1:] # DEBUG
     return dataset(data)
 
@@ -79,7 +80,7 @@ def read_raw_csv(in_file):
 # Note that pared manifolds are currently ignored.
 def write_csv(out_file, dataset, append=False):
     if not append:
-        out_file.write('InvariantTraceField,Root,Volume,InvariantTraceFieldDegree,NumberOfComplexPlaces,Disc,Factored,Name,Tetrahedra\n')
+        out_file.write('InvariantTraceField,Root,Volume,InvariantTraceFieldDegree,NumberOfComplexPlaces,Disc,Factored,Name,Tetrahedra,SolutionType\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
         for r in dataset.get_roots(p):
             deg = dataset.get_degree(p)
@@ -96,7 +97,8 @@ def write_csv(out_file, dataset, append=False):
                     out_file.write('"'+disc+'",')
                     out_file.write('"'+fact_disc+'",')
                     out_file.write('"'+m[0]+'",')
-                    out_file.write('"'+m[1]+'"\n')
+                    out_file.write('"'+m[1]+'",')
+                    out_file.write('"'+m[2]+'"\n')
 
 # Removes redundant manifold records with the same trace field (and root) and volume
 def pare_all_volumes(data):

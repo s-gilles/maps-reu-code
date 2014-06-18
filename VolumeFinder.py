@@ -154,7 +154,7 @@ def kickoff_snap():
     # No output is expected after these
     send_cmd(cprocess, 'set precision 10\n')
     send_cmd(cprocess, 'set digits_printed 100 f\n')
-
+    send_cmd(cprocess, 'set degree 8\n')
     return cprocess
 
 # Emulates typing string into a terminal running process. Note that since snap
@@ -345,7 +345,7 @@ will set up the default thread state."""
         new_thread.daemon = True
         new_thread.start()
         while snap_process[i] is None:
-            time.sleep(0.1)
+            time.sleep(1) #LMOD
         worker_threads.append(new_thread)
 
     have_written_out_already = False

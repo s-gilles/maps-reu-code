@@ -182,7 +182,7 @@ class FixedTorusBundleIterator:
                     ostr += '-R'
                 else:
                     ostr += '+R'
-                for v in bstr:
+                for v in bstr[1:]:
                     if v:
                         ostr += 'L'
                     else:

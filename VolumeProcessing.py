@@ -117,17 +117,20 @@ def cull_volumes(data,poly,root):
     while i < len(vols) - 1:
         j = i + 1
         while j < len(vols):
-            if is_int(float(vols[i])/float(vols[j])):
-                # [j] divides [i] so remove [i]
-                data.remove_volume(poly,root,vols[i])
-                # i is already effectivley incremented, so we must offset it
-                i = i-1
-                break
-            elif is_int(float(vols[j])/float(vols[i])):
-                # this time, remove [j]
-                data.remove_volume(poly,root,vols[j])
-                # j is effectivley incremented, no need to do it
-            else:
+            try:
+                if is_int(float(vols[i])/float(vols[j])):
+                    # [j] divides [i] so remove [i]
+                    data.remove_volume(poly,root,vols.pop(i))
+                    # i is already effectivley incremented, so we must offset it
+                    i = i-1
+                    break
+                elif is_int(float(vols[j])/float(vols[i])):
+                    # this time, remove [j]
+                    data.remove_volume(poly,root,vols.pop(j))
+                    # j is effectivley incremented, no need to do it
+                else:
+                    j += 1
+            except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
                 j += 1
         i += 1
 

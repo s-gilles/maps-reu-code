@@ -6,25 +6,25 @@
 class dataset:
     def __init__(self, data_dict = dict()):
         self.data = data_dict
- 
+
     def get_polys(self):
         return self.data.keys()
 
     def get_roots(self,poly):
-        return self.data[poly][0].keys()    
+        return self.data[poly][0].keys()
 
     def get_degree(self,poly):
         return self.data[poly][1]
-    
+
     def get_ncp(self,poly):
         return self.data[poly][2]
-    
+
     def get_disc(self,poly):
         return self.data[poly][3]
 
     def get_factored_disc(self,poly):
         return self.data[poly][4]
-    
+
     def get_volumes(self,poly,root):
         return self.data[poly][0][root].keys()
 
@@ -67,7 +67,7 @@ def read_raw_csv(in_file):
             # # why was vr set just now and not used?
             vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
             vol_entry[0].append((w[0],w[1]))
-            if len(data[w[3]]) == 2:            
+            if len(data[w[3]]) == 2:
                 data[w[3]].extend(w[6:9])
             # print data[w[3]][1:] # DEBUG
     return dataset(data)
@@ -82,7 +82,7 @@ def write_csv(out_file, dataset, append=False):
             for v in dataset.get_volumes(p,r):
                 for m in dataset.get_manifold_data(p,r,v):
                     out_file.write('"'+p+'",')
-                    out_file.write('"'+r+'",')  
+                    out_file.write('"'+r+'",')
                     out_file.write('"'+v+'",')
                     out_file.write('"'+dataset.get_degree(p)+'",')
                     out_file.write('"'+dataset.get_ncp(p)+'",')
@@ -104,7 +104,7 @@ def pare_volume(data,poly,root,vol):
     while len(mdata) > 1:
         mpared.append(mdata.pop(1)[0])
 
-# Removes volumes that are integer multiples of another volume 
+# Removes volumes that are integer multiples of another volume
 def cull_all_volumes(data):
     for p in data.get_polys():
         for r in data.get_roots(p):
@@ -135,7 +135,7 @@ def cull_volumes(data,poly,root):
         i += 1
 
 def is_int(fl, epsilon = .0000000000001):
-    return fl % 1 < epsilon or 1 - (fl % 1) < epsilon 
+    return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
 # Test code
 if __name__ == '__main__':

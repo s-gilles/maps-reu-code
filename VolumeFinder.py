@@ -263,7 +263,13 @@ def compute_shape_fields(idx):
                 degree = 0
                 ncp = int(trace_match.group(2).strip())
                 root = trace_match.group(3).strip()
-                sol_type = SOL_TYPE_STRINGS[int(manifold.solution_type(enum = True))]
+
+                sol_type = SOL_TYPE_STRINGS[-1]
+                try:
+                    sol_type = SOL_TYPE_STRINGS[int(manifold.solution_type(enum = True))]
+                except:
+                    pass
+
                 if dm is not None:
                     degree = int(dm.group(1))
                 if degree <= 8:

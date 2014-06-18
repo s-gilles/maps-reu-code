@@ -317,7 +317,7 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_globals)  # Unless shadowed by global
     d.update(frame.f_locals)
 
-def beginCollection(iterator, output_filename = 'output.csv', thread_num = 12):
+def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12):
     """Call this, given a batch iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 

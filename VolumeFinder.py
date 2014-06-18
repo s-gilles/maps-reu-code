@@ -43,21 +43,21 @@ SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degen
 
 pari.set_real_precision(100)
 
-# Each snap process is managed by one python thread.
-snap_process = [ ]
-
 # Paired with snap process creation to prevent signal propagation
 def preexec_discard_signals():
     os.setpgrp()
 
+# Each snap process is managed by one python thread.
+_snap_process = [ ]
+
 # A thread-safe queue for distributing manifolds to python threads, that work
 # may be done on them with snap
-ready_manifolds = Queue.Queue()
+_ready_manifolds = Queue.Queue()
 
 # A thread-safe queue for distributing messages from the python threads to the
 # main thread. e.g. Main thread sends SIG_MERGE to all workers, wishes to know
 # when the merge actually occurs.
-worker_to_main_messages = Queue.Queue()
+_worker_to_main_messages = Queue.Queue()
 
 # A list of all known hyperbolic volumes, organized by shape. The keys of this
 # dictionary are polynomials defining shape fields (e.g. x^2 - x + 1), and the
@@ -65,23 +65,23 @@ worker_to_main_messages = Queue.Queue()
 # volumes arising from that shape field, and elements of lists all known
 # manifolds that exhibit that volume.
 #
-# e.g. full_list['x^3 - x^2 - 3'] = {'-0.43 - 1.19*I' => [L12n2018, ...],
-#                                    '-0.43 + 1.19*I' => L11n371, ...],
-#                                    ...
-#                                   }
-full_list = dict()
-full_list_lock = threading.Lock()
+# e.g. _full_list['x^3 - x^2 - 3'] = {'-0.43 - 1.19*I' => [L12n2018, ...],
+#                                     '-0.43 + 1.19*I' => L11n371, ...],
+#                                     ...
+#                                    }
+_full_list = dict()
+_full_list_lock = threading.Lock()
 
 def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
-    global full_list, full_list_lock
-    with full_list_lock:
+    global _full_list, _full_list_lock
+    with _full_list_lock:
         if first_time:
             f = open(output_filename, 'w')
             f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,SolutionType,NumberOfComplexPlaces,Disc,DiscFactors\n')
         else:
             f = open(output_filename, 'a')
 
-        for poly,data in sorted(full_list.items()):
+        for poly,data in sorted(_full_list.items()):
             dm = re.match('x\^([0-9]+).*', poly)
             deg = '0'
             if dm is not None:
@@ -113,7 +113,7 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
                     f.write('"' + str(ncp) + '",')
                     f.write('"' + disc_str + '",')
                     f.write('"' + disc_fact_str + '"\n')
-        full_list = dict()
+        _full_list = dict()
         f.close()
 
 def drain(out):
@@ -133,10 +133,10 @@ def drain(out):
 # all, this method will not return in a timely fashion. Therefore, all threads
 # should perform
 #
-#     snap_process[my_unique_thread_id] = kickoff_snap()
+#     _snap_process[my_unique_thread_id] = kickoff_snap()
 #
 # as their first action. After a suitable waiting period (say 0.1s), those
-# threads corresponding to id's for which snap_process[id] is None are
+# threads corresponding to id's for which _snap_process[id] is None are
 # definitely hung, and may be restarted
 def kickoff_snap():
     cprocess = subprocess.Popen([SNAP_PATH],
@@ -166,12 +166,12 @@ def send_cmd(process, string):
     process.stdin.flush()
     return drain(process.stdout)
 
-# Merge a dictionary to full_list. This should be called in turn by each worker
+# Merge a dictionary to _full_list. This should be called in turn by each worker
 # thread once the list of manifolds to analyze has been exhausted
 def merge_up_dict(local_dict):
-    with full_list_lock:
+    with _full_list_lock:
         for polynomial_str, local_polydict in local_dict.items():
-            fulls_polydict = full_list.setdefault(polynomial_str, dict())
+            fulls_polydict = _full_list.setdefault(polynomial_str, dict())
             for vol, manifold_records in local_polydict.items():
                 fulls_manifolds = fulls_polydict.setdefault(vol, list())
                 fulls_manifolds.extend(manifold_records)
@@ -180,8 +180,8 @@ def merge_up_dict(local_dict):
 # perform computations.
 def compute_shape_fields(idx):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
-    global snap_process
-    global worker_to_main_messages
+    global _snap_process
+    global _worker_to_main_messages
     global SOL_TYPE_STRINGS
     local_dict = dict()
     fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
@@ -192,20 +192,20 @@ def compute_shape_fields(idx):
         # directly. It should be pretty easy to switch over once the full
         # triangulation files are saved - I'm just using temp files until they
         # get uploaded.
-        manifold, sig = ready_manifolds.get()
+        manifold, sig = _ready_manifolds.get()
 
         if sig is SIG_FINISH:
             merge_up_dict(local_dict)
-            ready_manifolds.task_done()
+            _ready_manifolds.task_done()
             break
         elif sig is SIG_DIE:
-            ready_manifolds.task_done()
+            _ready_manifolds.task_done()
             break
         elif sig is SIG_MERGE:
             merge_up_dict(local_dict)
             local_dict = dict()
-            ready_manifolds.task_done()
-            worker_to_main_messages.put((SIG_MERGE,))
+            _ready_manifolds.task_done()
+            _worker_to_main_messages.put((SIG_MERGE,))
             continue
 
         if os.path.isfile(TRIG_PATH+"/"+str(manifold)+".trig"):
@@ -215,12 +215,12 @@ def compute_shape_fields(idx):
             manifold.save(fname)
         while True:
             try:
-                send_cmd(snap_process[idx], 'read file ' + dname)
-                if snap_process[idx].poll() is not None:
+                send_cmd(_snap_process[idx], 'read file ' + dname)
+                if _snap_process[idx].poll() is not None:
                     raise IOError
 
-                snap_output = send_cmd(snap_process[idx], 'compute invariant_trace_field')
-                if snap_process[idx].poll() is not None:
+                snap_output = send_cmd(_snap_process[idx], 'compute invariant_trace_field')
+                if _snap_process[idx].poll() is not None:
                     raise IOError
 
                 # due to O_NONBLOCK and drain(), IOError doesn't show up until
@@ -228,20 +228,23 @@ def compute_shape_fields(idx):
                 break
             except IOError:
                 print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
-                snap_process[idx].terminate()
-                snap_process[idx] = kickoff_snap()
+                try:
+                    _snap_process[idx].terminate()
+                except:
+                    pass
+                _snap_process[idx] = kickoff_snap()
                 continue
 
         while True:
-            snap_output = snap_output + drain(snap_process[idx].stdout)
+            snap_output = snap_output + drain(_snap_process[idx].stdout)
             if RE_INV_TRACE_FIELD_NOT_FOUND.match(snap_output):
                 break
             elif RE_FUNC_REQ_GROUP.match(snap_output):
                 break
             elif RE_ERROR.match(snap_output):
                 print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
-                snap_process[idx].terminate()
-                snap_process[idx] = kickoff_snap()
+                _snap_process[idx].terminate()
+                _snap_process[idx] = kickoff_snap()
                 print(str(idx) + ' recovered')
                 break
 
@@ -264,24 +267,24 @@ def compute_shape_fields(idx):
                 break
             time.sleep(0.05)
             try:
-                snap_output = snap_output + send_cmd(snap_process[idx], '')
+                snap_output = snap_output + send_cmd(_snap_process[idx], '')
             except IOError:
                 # Force the next RE_ERROR.match to trigger
                 snap_output = 'Error'
 
-        ready_manifolds.task_done()
+        _ready_manifolds.task_done()
 
 
-    if snap_process[idx] is not None:
-        send_cmd(snap_process[idx], 'quit')
-    snap_process[idx] = None
+    if _snap_process[idx] is not None:
+        send_cmd(_snap_process[idx], 'quit')
+    _snap_process[idx] = None
 
     return
 
 # Wrapper around compute_shape_fields, in case any one-time startup/shutdown
 # code needs to be applied.
 def worker_action(idx):
-    snap_process[idx] = kickoff_snap()
+    _snap_process[idx] = kickoff_snap()
     compute_shape_fields(idx)
     return
 
@@ -315,7 +318,8 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_globals)  # Unless shadowed by global
     d.update(frame.f_locals)
 
-def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12):
+def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12,
+                     install_signal_handlers = True):
     """Call this, given a batch iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
@@ -335,21 +339,22 @@ will set up the default thread state."""
     global ACT_COLLECT_THEN_DIE
     global ACT_DIE
     global main_action
-    global snap_process
+    global _snap_process
 
     pari.set_real_precision(100)
 
     # Fiddle about with waiting for workers to startup
     print('Initializing...')
     worker_threads = list()
+    _snap_process = list()
     for i in range(0, thread_num):
-        snap_process.append(None)
+        _snap_process.append(None)
 
     for i in range(0, thread_num):
         new_thread = threading.Thread(group = None, target = worker_action, args = (i,))
         new_thread.daemon = True
         new_thread.start()
-        while snap_process[i] is None:
+        while _snap_process[i] is None:
             time.sleep(1) #LMOD
         worker_threads.append(new_thread)
 
@@ -360,26 +365,27 @@ will set up the default thread state."""
     #     kill -s SIGUSR1 $PID
     #
     # or such.
-    signal.signal(signal.SIGINT, sigint_handler)
-    signal.signal(signal.SIGUSR1, sigusr1_handler)
-    signal.signal(signal.SIGUSR2, sigusr2_handler)
+    if install_signal_handlers:
+        signal.signal(signal.SIGINT, sigint_handler)
+        signal.signal(signal.SIGUSR1, sigusr1_handler)
+        signal.signal(signal.SIGUSR2, sigusr2_handler)
 
     print('Working...')
 
+    main_action = ACT_DISTRUBUTE_WORK
     while True:
-        signal.signal(signal.SIGINT, sigint_handler)
         if main_action is ACT_DIE:
-            with ready_manifolds.mutex:
-                ready_manifolds.queue.clear()
+            with _ready_manifolds.mutex:
+                _ready_manifolds.queue.clear()
             for i in range(0, thread_num):
-                ready_manifolds.put((None, SIG_DIE))
+                _ready_manifolds.put((None, SIG_DIE))
             break
         elif main_action is ACT_COLLECT:
-            worker_to_main_messages.queue.clear()
+            _worker_to_main_messages.queue.clear()
             for i in range(0, thread_num):
-                ready_manifolds.put((None, SIG_MERGE))
+                _ready_manifolds.put((None, SIG_MERGE))
             for i in range(0, thread_num):
-                worker_to_main_messages.get()
+                _worker_to_main_messages.get()
             write_dict_to_output(output_filename, not have_written_out_already)
             have_written_out_already = True
             print('Wrote out current progress.')
@@ -387,19 +393,19 @@ will set up the default thread state."""
             continue
         elif main_action is ACT_COLLECT_THEN_DIE:
             for i in range(0, thread_num):
-                ready_manifolds.put((None, SIG_FINISH))
+                _ready_manifolds.put((None, SIG_FINISH))
             break
         elif main_action is ACT_DISTRUBUTE_WORK:
             try:
                 for m in iterator.next_batch():
-                    ready_manifolds.put((m, None))
+                    _ready_manifolds.put((m, None))
             except StopIteration:
                 print('Done.')
                 main_action = ACT_COLLECT_THEN_DIE
 
         # Would like to .join() here, but must use sleep() for signaling, or
         # some hogwash
-        while not ready_manifolds.empty():
+        while not _ready_manifolds.empty():
             time.sleep(0.05)
 
     # Ditto, can't .join()

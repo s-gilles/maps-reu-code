@@ -45,8 +45,6 @@ pari.set_real_precision(100)
 
 # Each snap process is managed by one python thread.
 snap_process = [ ]
-for i in range(0, thread_num):
-    snap_process.append(None)
 
 # Paired with snap process creation to prevent signal propagation
 def preexec_discard_signals():
@@ -344,6 +342,9 @@ will set up the default thread state."""
     # Fiddle about with waiting for workers to startup
     print('Initializing...')
     worker_threads = list()
+    for i in range(0, thread_num):
+        snap_process.append(None)
+
     for i in range(0, thread_num):
         new_thread = threading.Thread(group = None, target = worker_action, args = (i,))
         new_thread.daemon = True

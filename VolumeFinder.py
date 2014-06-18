@@ -55,6 +55,11 @@ def preexec_discard_signals():
 # may be done on them with snap
 ready_manifolds = Queue.Queue()
 
+# A thread-safe queue for distributing messages from the python threads to the
+# main thread. e.g. Main thread sends SIG_MERGE to all workers, wishes to know
+# when the merge actually occurs.
+worker_to_main_messages = Queue.Queue()
+
 # A list of all known hyperbolic volumes, organized by shape. The keys of this
 # dictionary are polynomials defining shape fields (e.g. x^2 - x + 1), and the
 # elements are lists of dictionaries. THESE dictionaries hav keys of hyperbolic
@@ -69,6 +74,7 @@ full_list = dict()
 full_list_lock = threading.Lock()
 
 def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
+    global full_list, full_list_lock
     with full_list_lock:
         if first_time:
             f = open(output_filename, 'w')
@@ -174,6 +180,7 @@ def merge_up_dict(local_dict):
 def compute_shape_fields(idx):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     global snap_process
+    global worker_to_main_messages
     local_dict = dict()
     fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
     snap_output = ''
@@ -196,6 +203,7 @@ def compute_shape_fields(idx):
             merge_up_dict(local_dict)
             local_dict = dict()
             ready_manifolds.task_done()
+            worker_to_main_messages.put((SIG_MERGE,))
             continue
 
         if os.path.isfile(TRIG_PATH+"/"+str(manifold)+".trig"):
@@ -362,10 +370,11 @@ will set up the default thread state."""
                 ready_manifolds.put((None, SIG_DIE))
             break
         elif main_action is ACT_COLLECT:
+            worker_to_main_messages.queue.clear()
             for i in range(0, THREAD_NUM):
                 ready_manifolds.put((None, SIG_MERGE))
-            while not ready_manifolds.empty():
-                time.sleep(0.05)
+            for i in range(0, THREAD_NUM):
+                worker_to_main_messages.get()
             write_dict_to_output(output_filename, not have_written_out_already)
             have_written_out_already = True
             print('Wrote out current progress.')

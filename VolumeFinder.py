@@ -40,6 +40,8 @@ RE_FUNC_REQ_GROUP = re.compile('.*Function requires a group.*', re.DOTALL)
 RE_ERROR = re.compile('.*Error.*', re.DOTALL)
 RE_TRACE_FIELD = re.compile('.*Invariant trace field: ([-+*x0-9^]+) \[[0-9]+,([0-9]+)\] [-0-9]+ R\([-0-9]+\) = ([-+*0-9.I]+).*', re.DOTALL)
 
+SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']
+
 pari.set_real_precision(100)
 
 # Each snap process is managed by one python thread.
@@ -78,7 +80,7 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
     with full_list_lock:
         if first_time:
             f = open(output_filename, 'w')
-            f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
+            f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,SolutionType,NumberOfComplexPlaces,Disc,DiscFactors\n')
         else:
             f = open(output_filename, 'a')
 
@@ -103,13 +105,15 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
                     m = rec[0]
                     ncp = rec[1]
                     root = rec[2]
+                    sol_type = rec[3]
                     f.write('"' + str(m) + '",')
                     f.write('"' + str(m.num_tetrahedra()) + '",')
                     f.write('"' + vol + '",')
                     f.write('"' + poly + '",')
                     f.write('"' + deg + '",')
-                    f.write('"' + rec[2] + '",')
-                    f.write('"' + str(rec[1]) + '",')
+                    f.write('"' + root + '",')
+                    f.write('"' + sol_type + '",')
+                    f.write('"' + str(ncp) + '",')
                     f.write('"' + disc_str + '",')
                     f.write('"' + disc_fact_str + '"\n')
         full_list = dict()
@@ -181,6 +185,7 @@ def compute_shape_fields(idx):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     global snap_process
     global worker_to_main_messages
+    global SOL_TYPE_STRINGS
     local_dict = dict()
     fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
     snap_output = ''
@@ -251,13 +256,14 @@ def compute_shape_fields(idx):
                 degree = 0
                 ncp = int(trace_match.group(2).strip())
                 root = trace_match.group(3).strip()
+                sol_type = SOL_TYPE_STRINGS[int(manifold.solution_type(enum = True))]
                 if dm is not None:
                     degree = int(dm.group(1))
-                if degree <= 8
+                if degree <= 8:
                     by_poly = local_dict.setdefault(polynomial, dict())
                     by_volume = by_poly.setdefault(vol, list())
                     # All the information to be sent back from the threads is packed in a tuple:
-                    by_volume.append((manifold,ncp,root))
+                    by_volume.append((manifold,ncp,root, sol_type))
                 break
             time.sleep(0.05)
             try:

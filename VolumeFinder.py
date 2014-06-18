@@ -73,7 +73,7 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
         if first_time:
             f = open(output_filename, 'w')
             f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,NumberOfComplexPlaces,Disc,DiscFactors\n')
-        else
+        else:
             f = open(output_filename, 'a')
 
         for poly,data in sorted(full_list.items()):

@@ -91,8 +91,15 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
             disc_fact_str = ''
             try:
                 for p, e in disc.factor().mattranspose():
-                    disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
-                disc_fact_str = disc_fact_str[:-1]
+                    if p is -1:
+                        disc_fact_str = disc_fact_str + '-1*'
+                    else:
+                        disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
+
+                if disc_fact_str == '':
+                    disc_fact_str = '1'
+                else:
+                    disc_fact_str = disc_fact_str[:-1]
             except ValueError:
                 disc_fact_str = disc_str
 

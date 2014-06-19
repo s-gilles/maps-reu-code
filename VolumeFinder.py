@@ -72,7 +72,7 @@ _worker_to_main_messages = Queue.Queue()
 _full_list = dict()
 _full_list_lock = threading.Lock()
 
-def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
+def write_dict_to_output(output_filename = 'output.csv',  first_time = True, separator = ';'):
     global _full_list, _full_list_lock
     with _full_list_lock:
         if first_time:
@@ -110,15 +110,15 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True):
                     ncp = rec[1]
                     root = rec[2]
                     sol_type = rec[3]
-                    f.write('"' + str(m) + '",')
-                    f.write('"' + str(m.num_tetrahedra()) + '",')
-                    f.write('"' + vol + '",')
-                    f.write('"' + poly + '",')
-                    f.write('"' + deg + '",')
-                    f.write('"' + root + '",')
-                    f.write('"' + sol_type + '",')
-                    f.write('"' + str(ncp) + '",')
-                    f.write('"' + disc_str + '",')
+                    f.write('"' + str(m) + '"' + separator)
+                    f.write('"' + str(m.num_tetrahedra()) + '"' + separator)
+                    f.write('"' + vol + '"' + separator)
+                    f.write('"' + poly + '"' + separator)
+                    f.write('"' + deg + '"' + separator)
+                    f.write('"' + root + '"' + separator)
+                    f.write('"' + sol_type + '"' + separator)
+                    f.write('"' + str(ncp) + '"' + separator)
+                    f.write('"' + disc_str + '"' + separator)
                     f.write('"' + disc_fact_str + '"\n')
         _full_list = dict()
         f.close()
@@ -332,7 +332,7 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_locals)
 
 def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12,
-                     install_signal_handlers = True, is_appending = False):
+                     install_signal_handlers = True, is_appending = False, csv_separator = ';'):
     """Call this, given a batch iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
@@ -348,11 +348,13 @@ Optional parameters:
     SIGINT will attempt to gracefully stop threads, gather their work, and close the program
     SIGINT twice will close the program
     SIGUSR1 will give a stack trace, without otherwise affecting operations
-    SIGUSR2 will write out partial progress (since last write) to output_filename so that it can be inspected. Note thta if this happens, the program will switch to appending mode (see below) to avoid erasing its own results.
+    SIGUSR2 will write out partial progress (since last write) to output_filename so that it can be inspected. Note thta if this happens, the program will switch to appending mode (see below) to avoid erasing its own results.  This is highly useful.
 
   thread_num (default = 12). Use this many worker threads.  It is recommended to be set to the number of logical cores on the system.
 
-  is_appending (default = False).  If set to True, the program will assume that output_filename already contains the results of some previous run, and will not overwrite them.  If set to False (the default!), the program will completely overwrite output_filename with its own results."""
+  is_appending (default = False).  If set to True, the program will assume that output_filename already contains the results of some previous run, and will not overwrite them.  If set to False (the default!), the program will completely overwrite output_filename with its own results.
+
+  csv_separator (default = ';').  Specifies the separator used in writing out csv files."""
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
     global TRIG_PATH
@@ -413,7 +415,8 @@ Optional parameters:
                 _ready_manifolds.put((None, SIG_MERGE))
             for i in range(0, thread_num):
                 _worker_to_main_messages.get()
-            write_dict_to_output(output_filename, not have_written_out_already)
+            write_dict_to_output(output_filename, first_time = not have_written_out_already,
+                                 separator = csv_separator)
             have_written_out_already = True
             print('Wrote out current progress.')
             main_action = ACT_DISTRUBUTE_WORK
@@ -439,4 +442,5 @@ Optional parameters:
     while any(w.is_alive() for w in worker_threads):
         time.sleep(0.05)
 
-    write_dict_to_output(output_filename, not have_written_out_already)
+    write_dict_to_output(output_filename, first_time = not have_written_out_already,
+                         separator = csv_separator)

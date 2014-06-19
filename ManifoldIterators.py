@@ -10,7 +10,7 @@ class QueueIterator:
     def __init__(self,sources):
         self.sources = sources
         self.finished = list()
-    
+
     def __iter__(self):
         return self
 
@@ -45,7 +45,7 @@ class QueueIterator:
 
     # Lets you see the current iterator
     def current():
-        return self.sources[0]    
+        return self.sources[0]
 
     # A list of iterators we went through.
     def finished():

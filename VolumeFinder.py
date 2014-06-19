@@ -332,13 +332,27 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_locals)
 
 def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12,
-                     install_signal_handlers = True):
+                     install_signal_handlers = True, is_appending = False):
     """Call this, given a batch iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
   beginCollection(BatchIterator(TorusBundleIterator), 50)
 
-will set up the default thread state."""
+will set up the default thread state.
+
+Optional parameters:
+
+  output_filename (default = 'output.csv'). A filename to which to write output.
+
+  install_signal_handlers (default = True). If set, the program will install signal handlers for the following:
+    SIGINT will attempt to gracefully stop threads, gather their work, and close the program
+    SIGINT twice will close the program
+    SIGUSR1 will give a stack trace, without otherwise affecting operations
+    SIGUSR2 will write out partial progress (since last write) to output_filename so that it can be inspected. Note thta if this happens, the program will switch to appending mode (see below) to avoid erasing its own results.
+
+  thread_num (default = 12). Use this many worker threads.  It is recommended to be set to the number of logical cores on the system.
+
+  is_appending (default = False).  If set to True, the program will assume that output_filename already contains the results of some previous run, and will not overwrite them.  If set to False (the default!), the program will completely overwrite output_filename with its own results."""
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
     global TRIG_PATH
@@ -371,7 +385,7 @@ will set up the default thread state."""
             time.sleep(1) #LMOD
         worker_threads.append(new_thread)
 
-    have_written_out_already = False
+    have_written_out_already = is_appending
 
     # To trigger these, find the PID and issue
     #

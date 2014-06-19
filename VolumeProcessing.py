@@ -46,14 +46,14 @@ class dataset:
 
 # Load a CSV file organized by manifold and reorganize it by polynomial and volume.
 # The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra), list (pared manifolds)), degree etc.)
-def read_raw_csv(in_file):
+def read_raw_csv(in_file, seperator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in in_file.readlines():
-            # To avoid breaking this, make sure to quote all data fields.
-            # Second replace is a bit of a hack b/c first was failing unexpectedly
-            # w = l.replace('\n','').strip('"').replace('","','$').split('$')
-            w = re.findall('"([^"]*)"', l) # Revert if you wish, I'm concerned about unknown, weird manifold names with '$' in them
+            if seperator == ',':    # special cased since ',' appears in Dehn surgery
+                w = re.findall('"([^"]*)"', l)
+            else:
+                w = l.replace('\n','').replace('"','').split(seperator)
             # Incase the disc was 1, a temporary hack:
             # if len(w) == 8:
             #   w.append('')
@@ -78,9 +78,9 @@ def read_raw_csv(in_file):
 
 # Writes a CSV file containing the mainfolds records as shown below.
 # Note that pared manifolds are currently ignored.
-def write_csv(out_file, dataset, append=False):
+def write_csv(out_file, dataset, append=False, seperator = ';'):
     if not append:
-        out_file.write('InvariantTraceField,Root,Volume,InvariantTraceFieldDegree,NumberOfComplexPlaces,Disc,Factored,Name,Tetrahedra,SolutionType\n')
+        out_file.write('InvariantTraceField'+seperator+'Root'+seperator+'Volume'+seperator+'InvariantTraceFieldDegree'+seperator+'NumberOfComplexPlaces'+seperator+'Disc'+seperator+'Factored'+seperator+'Name'+seperator+'Tetrahedra'+seperator+'SolutionType\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
         for r in dataset.get_roots(p):
             deg = dataset.get_degree(p)
@@ -89,15 +89,15 @@ def write_csv(out_file, dataset, append=False):
             fact_disc = dataset.get_factored_disc(p)
             for v in dataset.get_volumes(p,r):
                 for m in dataset.get_manifold_data(p,r,v):
-                    out_file.write('"'+p+'",')
-                    out_file.write('"'+r+'",')
-                    out_file.write('"'+v+'",')
-                    out_file.write('"'+deg+'",')
-                    out_file.write('"'+ncp+'",')
-                    out_file.write('"'+disc+'",')
-                    out_file.write('"'+fact_disc+'",')
-                    out_file.write('"'+m[0]+'",')
-                    out_file.write('"'+m[1]+'",')
+                    out_file.write('"'+p+'"'+seperator)
+                    out_file.write('"'+r+'"'+seperator)
+                    out_file.write('"'+v+'"'+seperator)
+                    out_file.write('"'+deg+'"'+seperator)
+                    out_file.write('"'+ncp+'"'+seperator)
+                    out_file.write('"'+disc+'"'+seperator)
+                    out_file.write('"'+fact_disc+'"'+seperator)
+                    out_file.write('"'+m[0]+'"'+seperator)
+                    out_file.write('"'+m[1]+'"'+seperator)
                     out_file.write('"'+m[2]+'"\n')
 
 # Removes redundant manifold records with the same trace field (and root) and volume

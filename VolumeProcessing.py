@@ -30,7 +30,7 @@ class dataset:
     def get_volumes(self,poly,root):
         return self.data[poly][0][root].keys()
 
-    # Returns pairs of a manifold's name and number of simplices
+    # Returns triplets of a manifold's name, number of simplices, and solution type
     def get_manifold_data(self,poly,root,vol):
         return self.data[poly][0][root][vol][0]
 
@@ -43,9 +43,32 @@ class dataset:
         rec = self.data[poly][0][root].get(vol)
         del self.data[poly][0][root][vol]
         return rec
+    
+    # Combines this dataset with the dataset other; in case of a difference, other's values beat self's    
+    def combine_with(self,other):
+        self.update(other)
+
+# read in raw csv in_file, pare and cull it, write it to out_file
+def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):    
+    inf = open(in_filenm,'r')
+    try:    
+        inf.readline()
+        d = read_raw_csv(inf, seperator = in_seperator)
+    finally:
+        inf.close()
+    pare_all_volumes(d)
+    cull_all_volumes(d)
+    if out_append:
+        ouf = open(out_filenm,'a')
+    else:
+        ouf = open(out_filenm,'w')
+    try:
+        write_csv(ouf, d, seperator = out_seperator, append = out_append)
+    finally:
+        ouf.close()
 
 # Load a CSV file organized by manifold and reorganize it by polynomial and volume.
-# The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra), list (pared manifolds)), degree etc.)
+# The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra, soltype), list (pared manifolds)), degree etc.)
 def read_raw_csv(in_file, seperator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
@@ -76,9 +99,24 @@ def read_raw_csv(in_file, seperator = ';'):
             # print data[w[3]][1:] # DEBUG
     return dataset(data)
 
+# Reads a CSV produced by write_csv and returns the contents as a dataset object
+def read_csv(in_file, seperator = ';'):
+    data = dict()
+    for l in in_file.readlines():
+        if seperator == ',':    # again special cased
+            w = re.findall('"([^"]*)"', l)
+        else:
+            w = l.replace('\n','').replace('"','').split(seperator)
+        vol_entry = data.setdefault(w[0],[dict(),w[3]])[0].setdefault(w[1],dict()).setdefault(w[2],[list(),list()])
+        vol_entry[0].append((w[7],w[8],w[9]))
+        if len(data[w[0]]) == 2:
+            data[w[0]].extend(w[4:7])
+    return dataset(data)
+
+
 # Writes a CSV file containing the mainfolds records as shown below.
 # Note that pared manifolds are currently ignored.
-def write_csv(out_file, dataset, append=False, seperator = ';'):
+def write_csv(out_file, dataset, seperator = ';', append=False):
     if not append:
         out_file.write('InvariantTraceField'+seperator+'Root'+seperator+'Volume'+seperator+'InvariantTraceFieldDegree'+seperator+'NumberOfComplexPlaces'+seperator+'Disc'+seperator+'Factored'+seperator+'Name'+seperator+'Tetrahedra'+seperator+'SolutionType\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):

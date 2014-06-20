@@ -160,7 +160,7 @@ class FixedTorusBundleIterator:
 #                        targ[idx+1] =
 #                for b in self.src:
             try:
-                while self.next() is not start:
+                while self.next().name() != start.name():
                     pass
             except StopIteration:
                 print 'Warning: tried to start iterator with non-output '+start.name()+'.'
@@ -347,6 +347,7 @@ class DehnFillIterator:
         self.all_pqs = pqs_in_range(full_dehn_pq_limit, self.current_manifold.num_cusps())
         self.pq_iter = iter(self.all_pqs)
         self.dehn_pq_limit = full_dehn_pq_limit
+        self.peek_ret = None
 
     def next(self):
         while True:
@@ -359,8 +360,12 @@ class DehnFillIterator:
                     if curr_pq is not None:
                         m.dehn_fill(curr_pq, curr_idx)
                     curr_idx = curr_idx + 1
+                self.peek_ret = m
                 return m
             except StopIteration:
                 self.current_manifold = self.pulling_from.next()
                 self.all_pqs = pqs_in_range(self.dehn_pq_limit, self.current_manifold.num_cusps())
                 self.pq_iter = iter(self.all_pqs)
+
+    def peek(self):
+        return self.peek_ret

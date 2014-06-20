@@ -91,7 +91,7 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
             disc_fact_str = ''
             try:
                 for p, e in disc.factor().mattranspose():
-                    if p is -1:
+                    if p == -1:
                         disc_fact_str = disc_fact_str + '-1*'
                     else:
                         disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'

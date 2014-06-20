@@ -93,6 +93,9 @@ class BatchIterator:
                 break   #...but if we have a partial batch, return it.
         return ret
 
+    def last(self):
+        return self.source.last()
+
 # Because itertools returns the same thing more than once.
 class MaskIterator:
 
@@ -157,7 +160,7 @@ class FixedTorusBundleIterator:
 #                        targ[idx+1] =
 #                for b in self.src:
             try:
-                while self.next() is not start:
+                while self.next().name() != start.name():
                     pass
             except StopIteration:
                 print 'Warning: tried to start iterator with non-output '+start.name()+'.'
@@ -335,15 +338,18 @@ def pqs_in_range(dehn_pq_limit, num_cusps):
     return product(*pqs_mult)
 
 class DehnFillIterator:
-    def __init__(self, source, full_dehn_pq_limit = 24, already_done_manifolds_up_to = 0):
+    def __init__(self, source, full_dehn_pq_limit = 24, fast_forward_to_pq = None):
         self.mnum = 0
         self.pulling_from = source
-        for i in range(0, already_done_manifolds_up_to):
-            self.pulling_from.next()
         self.current_manifold = self.pulling_from.next()
         self.all_pqs = pqs_in_range(full_dehn_pq_limit, self.current_manifold.num_cusps())
         self.pq_iter = iter(self.all_pqs)
+        if fast_forward_to_pq is not None:
+            tmp_pq = None
+            while tmp_pq != fast_forward_to_pq:
+                tmp_pq = self.pq_iter.next()
         self.dehn_pq_limit = full_dehn_pq_limit
+        self.peek_ret = None
 
     def next(self):
         while True:
@@ -356,8 +362,12 @@ class DehnFillIterator:
                     if curr_pq is not None:
                         m.dehn_fill(curr_pq, curr_idx)
                     curr_idx = curr_idx + 1
+                self.peek_ret = m
                 return m
             except StopIteration:
                 self.current_manifold = self.pulling_from.next()
                 self.all_pqs = pqs_in_range(self.dehn_pq_limit, self.current_manifold.num_cusps())
                 self.pq_iter = iter(self.all_pqs)
+
+    def peek(self):
+        return self.peek_ret

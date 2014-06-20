@@ -91,7 +91,7 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
             disc_fact_str = ''
             try:
                 for p, e in disc.factor().mattranspose():
-                    if p is -1:
+                    if p == -1:
                         disc_fact_str = disc_fact_str + '-1*'
                     else:
                         disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
@@ -250,7 +250,10 @@ def compute_shape_fields(idx):
                 break
             elif RE_ERROR.match(snap_output):
                 print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
-                _snap_process[idx].terminate()
+                try:
+                    _snap_process[idx].terminate()
+                except:
+                    pass
                 _snap_process[idx] = kickoff_snap()
                 print(str(idx) + ' recovered')
                 break
@@ -419,6 +422,10 @@ Optional parameters:
                                  separator = csv_separator)
             have_written_out_already = True
             print('Wrote out current progress.')
+            try:
+                print('That was for manifolds up to, but not including: ' + str(iterator.last()))
+            except:
+                pass
             main_action = ACT_DISTRUBUTE_WORK
             continue
         elif main_action is ACT_COLLECT_THEN_DIE:

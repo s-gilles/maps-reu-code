@@ -127,8 +127,8 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
                     f.write('"' + deg + '"' + separator)
                     f.write('"' + sol_type + '"' + separator)
                     f.write('"' + disc_str + '"' + separator)
-                    f.write('"' + disc_fact_str + '"\n')
-                    f.write('"' + str(m.num_tetrahedra()) + '"' + separator)
+                    f.write('"' + disc_fact_str + '"' + separator)
+                    f.write('"' + str(m.num_tetrahedra()) + '"\n')
         _full_list = dict()
         f.close()
 

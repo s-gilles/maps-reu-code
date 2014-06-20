@@ -77,7 +77,16 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
     with _full_list_lock:
         if first_time:
             f = open(output_filename, 'w')
-            f.write('Name,Tetrahedra,Volume,InvariantTraceField,InvariantTraceFieldDegree,Root,SolutionType,NumberOfComplexPlaces,Disc,DiscFactors\n')
+            f.write('Name' + separator +
+                    'InvariantTraceField' + separator +
+                    'Root' + separator +
+                    'NumberOfComplexPlaces' + separator +
+                    'Volume' + separator +
+                    'InvariantTraceFieldDegree' + separator +
+                    'SolutionType' + separator +
+                    'Disc' + separator +
+                    'DiscFactors' + separator +
+                    'Tetrahedra\n')
         else:
             f = open(output_filename, 'a')
 
@@ -91,8 +100,8 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
             disc_fact_str = ''
             try:
                 for p, e in disc.factor().mattranspose():
-                    if p == -1:
-                        disc_fact_str = disc_fact_str + '-1*'
+                    if e == 1:
+                        disc_fact_str = disc_fact_str + str(p) + '*'
                     else:
                         disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
 
@@ -111,15 +120,15 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
                     root = rec[2]
                     sol_type = rec[3]
                     f.write('"' + str(m) + '"' + separator)
-                    f.write('"' + str(m.num_tetrahedra()) + '"' + separator)
-                    f.write('"' + vol + '"' + separator)
                     f.write('"' + poly + '"' + separator)
-                    f.write('"' + deg + '"' + separator)
                     f.write('"' + root + '"' + separator)
-                    f.write('"' + sol_type + '"' + separator)
                     f.write('"' + str(ncp) + '"' + separator)
+                    f.write('"' + vol + '"' + separator)
+                    f.write('"' + deg + '"' + separator)
+                    f.write('"' + sol_type + '"' + separator)
                     f.write('"' + disc_str + '"' + separator)
                     f.write('"' + disc_fact_str + '"\n')
+                    f.write('"' + str(m.num_tetrahedra()) + '"' + separator)
         _full_list = dict()
         f.close()
 
@@ -145,7 +154,7 @@ def drain(out):
 # as their first action. After a suitable waiting period (say 0.1s), those
 # threads corresponding to id's for which _snap_process[id] is None are
 # definitely hung, and may be restarted
-def kickoff_snap():
+def kickoff_snap(temp_file_dir):
     cprocess = subprocess.Popen([SNAP_PATH],
                                 bufsize = 1,
                                 shell = False,
@@ -163,6 +172,7 @@ def kickoff_snap():
     send_cmd(cprocess, 'set precision 10\n')
     send_cmd(cprocess, 'set digits_printed 100 f\n')
     send_cmd(cprocess, 'set degree 8\n')
+    send_cmd(cprocess, 'set path ' + temp_file_dir + '\n')
     return cprocess
 
 # Emulates typing string into a terminal running process. Note that since snap
@@ -185,13 +195,14 @@ def merge_up_dict(local_dict):
 
 # The action that a worker thread takes.  Simply read from the Queue and
 # perform computations.
-def compute_shape_fields(idx):
+def compute_shape_fields(idx, temp_file_dir):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     global _snap_process
     global _worker_to_main_messages
     global SOL_TYPE_STRINGS
     local_dict = dict()
     fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
+    full_fname = temp_file_dir + fname
     snap_output = ''
     while True:
 
@@ -215,14 +226,10 @@ def compute_shape_fields(idx):
             _worker_to_main_messages.put((SIG_MERGE,))
             continue
 
-        if os.path.isfile(TRIG_PATH+"/"+str(manifold)+".trig"):
-            dname = TRIG_PATH+"/"+str(manifold)+".trig"
-        else:
-            dname = fname
-            manifold.save(fname)
+        manifold.save(full_fname)
         while True:
             try:
-                send_cmd(_snap_process[idx], 'read file ' + dname)
+                send_cmd(_snap_process[idx], 'read file ' + fname)
                 if _snap_process[idx].poll() is not None:
                     raise IOError
 
@@ -239,7 +246,7 @@ def compute_shape_fields(idx):
                     _snap_process[idx].terminate()
                 except:
                     pass
-                _snap_process[idx] = kickoff_snap()
+                _snap_process[idx] = kickoff_snap(temp_file_dir)
                 continue
 
         while True:
@@ -254,7 +261,7 @@ def compute_shape_fields(idx):
                     _snap_process[idx].terminate()
                 except:
                     pass
-                _snap_process[idx] = kickoff_snap()
+                _snap_process[idx] = kickoff_snap(temp_file_dir)
                 print(str(idx) + ' recovered')
                 break
 
@@ -299,9 +306,9 @@ def compute_shape_fields(idx):
 
 # Wrapper around compute_shape_fields, in case any one-time startup/shutdown
 # code needs to be applied.
-def worker_action(idx):
-    _snap_process[idx] = kickoff_snap()
-    compute_shape_fields(idx)
+def worker_action(idx, temp_file_dir= '/tmp/'):
+    _snap_process[idx] = kickoff_snap(temp_file_dir)
+    compute_shape_fields(idx, temp_file_dir)
     return
 
 def double_sigint_handler(signum, frame):
@@ -423,7 +430,7 @@ Optional parameters:
             have_written_out_already = True
             print('Wrote out current progress.')
             try:
-                print('That was for manifolds up to, but not including: ' + str(iterator.last()))
+                print('That was for manifolds up to (possibly not including): ' + str(iterator.last()))
             except:
                 pass
             main_action = ACT_DISTRUBUTE_WORK

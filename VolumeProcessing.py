@@ -48,11 +48,29 @@ class dataset:
     def combine_with(self,other):
         self.update(other)
 
+# combines two output files from this program
+def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
+    dsets = list()    
+    for i in xrange(len(filenms)):
+        inf = open(filenms[i],'r')        
+        try:
+            inf.readline()  # skip header
+            dsets.append(read_csv(inf, seperator = fileseps[i]))
+        finally:
+            inf.close()
+    for d in dsets[1:]:
+        dsets[0].combine_with(d)
+    if out_append:
+        ouf = open(out_filenm, 'a')
+    else:
+        ouf = open(out_filenm, 'w')
+    write_csv(ouf, dsets[0], seperator = out_seperator, append = out_append)
+
 # read in raw csv in_file, pare and cull it, write it to out_file
 def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):    
     inf = open(in_filenm,'r')
     try:    
-        inf.readline()
+        inf.readline()  # skip header
         d = read_raw_csv(inf, seperator = in_seperator)
     finally:
         inf.close()

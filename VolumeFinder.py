@@ -250,7 +250,10 @@ def compute_shape_fields(idx):
                 break
             elif RE_ERROR.match(snap_output):
                 print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
-                _snap_process[idx].terminate()
+                try:
+                    _snap_process[idx].terminate()
+                except:
+                    pass
                 _snap_process[idx] = kickoff_snap()
                 print(str(idx) + ' recovered')
                 break

@@ -419,6 +419,10 @@ Optional parameters:
                                  separator = csv_separator)
             have_written_out_already = True
             print('Wrote out current progress.')
+            try:
+                print('That was for manifolds up to, but not including: ' + str(iterator.last()))
+            except:
+                pass
             main_action = ACT_DISTRUBUTE_WORK
             continue
         elif main_action is ACT_COLLECT_THEN_DIE:

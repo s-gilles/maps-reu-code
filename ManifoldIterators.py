@@ -93,6 +93,9 @@ class BatchIterator:
                 break   #...but if we have a partial batch, return it.
         return ret
 
+    def last(self):
+        return self.source.last()
+
 # Because itertools returns the same thing more than once.
 class MaskIterator:
 

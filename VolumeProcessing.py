@@ -118,7 +118,22 @@ def read_raw_csv(in_file, seperator = ';'):
     return dataset(data)
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
-def read_csv(in_file, seperator = ';'):
+# This variant handles csv's before we swapped column order around a bit.
+def read_old_csv(in_file, seperator = ';'):
+    data = dict()
+    for l in in_file.readlines():
+        if seperator == ',':    # again special cased
+            w = re.findall('"([^"]*)"', l)
+        else:
+            w = l.replace('\n','').replace('"','').split(seperator)
+        vol_entry = data.setdefault(w[0],[dict(),w[3]])[0].setdefault(w[1],dict()).setdefault(w[2],[list(),list()])
+        vol_entry[0].append((w[7],w[8],w[9]))
+        if len(data[w[0]]) == 2:
+            data[w[0]].extend(w[4:7])
+    return dataset(data)
+
+# Reads a CSV produced by write_csv and returns the contents as a dataset object
+def read_csv(in_file, seperator = ';'): # HERE
     data = dict()
     for l in in_file.readlines():
         if seperator == ',':    # again special cased
@@ -136,7 +151,16 @@ def read_csv(in_file, seperator = ';'):
 # Note that pared manifolds are currently ignored.
 def write_csv(out_file, dataset, seperator = ';', append=False):
     if not append:
-        out_file.write('InvariantTraceField'+seperator+'Root'+seperator+'Volume'+seperator+'InvariantTraceFieldDegree'+seperator+'NumberOfComplexPlaces'+seperator+'Disc'+seperator+'Factored'+seperator+'Name'+seperator+'Tetrahedra'+seperator+'SolutionType\n')
+        out_file.write('Name'+seperator+
+                        'InvariantTraceField'+seperator+
+                        'Root'+seperator+
+                        'NumberOfComplexPlaces'+seperator+
+                        'Volume'+seperator+
+                        'InvariantTraceFieldDegree'+seperator+
+                        'SolutionType'+seperator+
+                        'Disc'+seperator+
+                        'Factored'+seperator+
+                        'Tetrahedra\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
         for r in dataset.get_roots(p):
             deg = dataset.get_degree(p)
@@ -145,16 +169,16 @@ def write_csv(out_file, dataset, seperator = ';', append=False):
             fact_disc = dataset.get_factored_disc(p)
             for v in dataset.get_volumes(p,r):
                 for m in dataset.get_manifold_data(p,r,v):
+                    out_file.write('"'+m[0]+'"'+seperator)
                     out_file.write('"'+p+'"'+seperator)
                     out_file.write('"'+r+'"'+seperator)
+                    out_file.write('"'+ncp+'"'+seperator)
                     out_file.write('"'+v+'"'+seperator)
                     out_file.write('"'+deg+'"'+seperator)
-                    out_file.write('"'+ncp+'"'+seperator)
+                    out_file.write('"'+m[2]+'"'+seperator)
                     out_file.write('"'+disc+'"'+seperator)
                     out_file.write('"'+fact_disc+'"'+seperator)
-                    out_file.write('"'+m[0]+'"'+seperator)
-                    out_file.write('"'+m[1]+'"'+seperator)
-                    out_file.write('"'+m[2]+'"\n')
+                    out_file.write('"'+m[1]+'"\n')
 
 # Removes redundant manifold records with the same trace field (and root) and volume
 def pare_all_volumes(data):

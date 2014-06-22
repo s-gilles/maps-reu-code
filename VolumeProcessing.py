@@ -95,6 +95,8 @@ def read_raw_csv(in_file, seperator = ';'):
                 w = re.findall('"([^"]*)"', l)
             else:
                 w = l.replace('\n','').replace('"','').split(seperator)
+            # Since order got changed (for some unknown reason):
+            w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
             # Incase the disc was 1, a temporary hack:
             # if len(w) == 8:
             #   w.append('')

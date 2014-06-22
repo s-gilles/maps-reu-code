@@ -37,7 +37,7 @@ main_action = ACT_DISTRUBUTE_WORK
 RE_INV_TRACE_FIELD_NOT_FOUND = re.compile('.*Invariant trace field not found.*', re.DOTALL)
 RE_FUNC_REQ_GROUP = re.compile('.*Function requires a group.*', re.DOTALL)
 RE_ERROR = re.compile('.*Error.*', re.DOTALL)
-RE_TRACE_FIELD = re.compile('.*Invariant trace field: ([-+*x0-9^]+) \[[0-9]+,([0-9]+)\] [-0-9]+ R\([-0-9]+\) = ([-+*0-9.I]+).*', re.DOTALL)
+RE_TRACE_FIELD = re.compile('.*Invariant trace field: ([-+*x0-9^ ]+) \[[0-9]+, *([0-9]+)\] [-0-9]+ R\([-0-9]+\) = ([-+*0-9.I]+).*', re.DOTALL)
 
 SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']
 
@@ -267,7 +267,11 @@ def compute_shape_fields(idx, temp_file_dir):
 
             trace_match = RE_TRACE_FIELD.match(snap_output)
             if trace_match is not None:
-                vol = str(manifold.high_precision().volume())
+                try:
+                    vol = str(manifold.high_precision().volume())
+                except:
+                    print(str(manifold) + ' crashed pari while determining volume in ' + str(idx) + '!')
+                    vol = str(manifold.volume())
                 polynomial = trace_match.group(1).strip()
                 dm = re.match('x\^([0-9]+).*', polynomial)
                 degree = 0

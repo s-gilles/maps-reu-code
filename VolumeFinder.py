@@ -226,6 +226,20 @@ def compute_shape_fields(idx, temp_file_dir):
             _worker_to_main_messages.put((SIG_MERGE,))
             continue
 
+
+        sol_type = SOL_TYPE_STRINGS[-1]
+        sol_enum = int(manifold.solution_type(enum = True))
+        try:
+            sol_type = SOL_TYPE_STRINGS[sol_enum]
+        except:
+            pass
+
+        # Bail if not 'geometric' or 'non-geometric' or 'flat'
+        if sol_enum != 1 and sol_enum != 2 and sol_enum != 3:
+            _ready_manifolds.task_done()
+            continue
+
+
         manifold.save(full_fname)
         while True:
             try:
@@ -277,12 +291,6 @@ def compute_shape_fields(idx, temp_file_dir):
                 degree = 0
                 ncp = int(trace_match.group(2).strip())
                 root = trace_match.group(3).strip()
-
-                sol_type = SOL_TYPE_STRINGS[-1]
-                try:
-                    sol_type = SOL_TYPE_STRINGS[int(manifold.solution_type(enum = True))]
-                except:
-                    pass
 
                 if dm is not None:
                     degree = int(dm.group(1))

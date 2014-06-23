@@ -186,20 +186,16 @@ class FixedTorusBundleIterator:
                 continue
         return out
 
+    # Note that this method does not account for the case where the last index was skipped because it produced a ValueError
+    # This seems to happen whenever that index = 2**n or 2**n + 1
+    # Note also that this and other last_foo methods are unreliable when next() has never been called.
     def last_idx(self):
-        return idx - 1  # idx gets incremented in next() call before it is used
+        return self.idx - 1  # idx gets incremented in next() call before it is used
 
 class TorusBundleIterator:
-    def __init__(self, start=2): # start may be int (number of simplices) or manifold
-        if isinstance(start, Manifold):
-            self.l = len(start.name()) - 3
-            self.src = FixedTorusBundleIterator(self.l,start=start)
-        elif not isinstance(start, int):
-            print 'Warning: tried to start a manifold iterator at '+str(start)+'.'
-            start = 2
-        if isinstance(start, int):
-            self.l = start
-            self.src = FixedTorusBundleIterator(start)
+    def __init__(self, start_length=2, start_idx=0):
+        self.l = start_length
+        self.src = FixedTorusBundleIterator(self.l, start_index = start_idx)
 
     def __iter__(self):
             return self
@@ -212,6 +208,19 @@ class TorusBundleIterator:
                 self.l += 1
                 self.src = FixedTorusBundleIterator(self.l)
                 continue
+
+    def last_idx(self):
+        i = self.src.last_idx()
+        if i == -1:
+            return 2**(self.l-1)-1 # We just got to this length
+        else:
+            return i
+
+    def last_length(self):
+        if self.src.last_idx() == -1:
+            return self.l - 1
+        else:
+            return self.l
 
 class FixedDTIterator:
     # Set start to a manifold this iterator will later output, and the iterator

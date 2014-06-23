@@ -72,6 +72,9 @@ _worker_to_main_messages = Queue.Queue()
 _full_list = dict()
 _full_list_lock = threading.Lock()
 
+_discriminants = dict()
+_discriminants_lock = threading.Lock()
+
 def write_dict_to_output(output_filename = 'output.csv',  first_time = True, separator = ';'):
     global _full_list, _full_list_lock
     with _full_list_lock:
@@ -90,45 +93,52 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
         else:
             f = open(output_filename, 'a')
 
-        for poly,data in sorted(_full_list.items()):
-            dm = re.match('x\^([0-9]+).*', poly)
-            deg = '0'
-            if dm is not None:
-                deg = dm.group(1)
-            disc = pari(poly).nfdisc()
-            disc_str = str(disc)
-            disc_fact_str = ''
-            try:
-                for p, e in disc.factor().mattranspose():
-                    if e == 1:
-                        disc_fact_str = disc_fact_str + str(p) + '*'
-                    else:
-                        disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
+        with _discriminants_lock:
+            for poly,data in sorted(_full_list.items()):
+                dm = re.match('x\^([0-9]+).*', poly)
+                deg = '0'
+                if dm is not None:
+                    deg = dm.group(1)
 
-                if disc_fact_str == '':
-                    disc_fact_str = '1'
+                if poly in _discriminants:
+                    disc_str, disc_fact_str = _discriminants[poly]
                 else:
-                    disc_fact_str = disc_fact_str[:-1]
-            except ValueError:
-                disc_fact_str = disc_str
+                    disc = pari(poly).nfdisc()
+                    disc_str = str(disc)
+                    disc_fact_str = ''
+                    try:
+                        for p, e in disc.factor().mattranspose():
+                            if e == 1:
+                                disc_fact_str = disc_fact_str + str(p) + '*'
+                            else:
+                                disc_fact_str = disc_fact_str + str(p) + '^' + str(e) + '*'
 
-            for vol, l in sorted(data.items()):
-                for rec in l:
-                    #unpack tuples
-                    m = rec[0]
-                    ncp = rec[1]
-                    root = rec[2]
-                    sol_type = rec[3]
-                    f.write('"' + str(m) + '"' + separator)
-                    f.write('"' + poly + '"' + separator)
-                    f.write('"' + root + '"' + separator)
-                    f.write('"' + str(ncp) + '"' + separator)
-                    f.write('"' + vol + '"' + separator)
-                    f.write('"' + deg + '"' + separator)
-                    f.write('"' + sol_type + '"' + separator)
-                    f.write('"' + disc_str + '"' + separator)
-                    f.write('"' + disc_fact_str + '"' + separator)
-                    f.write('"' + str(m.num_tetrahedra()) + '"\n')
+                        if disc_fact_str == '':
+                            disc_fact_str = '1'
+                        else:
+                            disc_fact_str = disc_fact_str[:-1]
+                    except ValueError:
+                        disc_fact_str = disc_str
+
+                    _discriminants[poly] = (disc_str, disc_fact_str)
+
+                for vol, l in sorted(data.items()):
+                    for rec in l:
+                        #unpack tuples
+                        m = rec[0]
+                        ncp = rec[1]
+                        root = rec[2]
+                        sol_type = rec[3]
+                        f.write('"' + str(m) + '"' + separator)
+                        f.write('"' + poly + '"' + separator)
+                        f.write('"' + root + '"' + separator)
+                        f.write('"' + str(ncp) + '"' + separator)
+                        f.write('"' + vol + '"' + separator)
+                        f.write('"' + deg + '"' + separator)
+                        f.write('"' + sol_type + '"' + separator)
+                        f.write('"' + disc_str + '"' + separator)
+                        f.write('"' + disc_fact_str + '"' + separator)
+                        f.write('"' + str(m.num_tetrahedra()) + '"\n')
         _full_list = dict()
         f.close()
 

@@ -326,8 +326,8 @@ def pqs_in_range(dehn_pq_limit, num_cusps):
 
     # pqs = [ None, (0,0), (0,1), (0,3), (5,12), (9,13), ... ]
     pqs = list()
-    for p in range(-1 * dehn_pq_limit, dehn_pq_limit):
-        for q in range(0, dehn_pq_limit):
+    for p in range(-1 * dehn_pq_limit, dehn_pq_limit + 1):
+        for q in range(0, dehn_pq_limit + 1):
             if abs(gcd(p,q)) <= 1:
                 pqs.append((p,q))
     pqs.append(None)
@@ -340,11 +340,15 @@ def pqs_in_range(dehn_pq_limit, num_cusps):
     return product(*pqs_mult)
 
 class DehnFillIterator:
-    def __init__(self, source, full_dehn_pq_limit = 24, fast_forward_to_pq = None):
+    def __init__(self, source, full_dehn_pq_limit = [6, 16, 16, 8, 6], fast_forward_to_pq = None):
         self.mnum = 0
         self.pulling_from = source
         self.current_manifold = self.pulling_from.next()
-        self.all_pqs = pqs_in_range(full_dehn_pq_limit, self.current_manifold.num_cusps())
+        try:
+            pq_limit = full_dehn_pq_limit[self.current_manifold.num_cusps()]
+        except:
+            pq_limit = full_dehn_pq_limit[0]
+        self.all_pqs = pqs_in_range(pq_limit, self.current_manifold.num_cusps())
         self.pq_iter = iter(self.all_pqs)
         if fast_forward_to_pq is not None:
             tmp_pq = None
@@ -368,7 +372,11 @@ class DehnFillIterator:
                 return m
             except StopIteration:
                 self.current_manifold = self.pulling_from.next()
-                self.all_pqs = pqs_in_range(self.dehn_pq_limit, self.current_manifold.num_cusps())
+                try:
+                    pq_limit = self.dehn_pq_limit[self.current_manifold.num_cusps()]
+                except:
+                    pq_limit = self.dehn_pq_limit[0]
+                self.all_pqs = pqs_in_range(pq_limit, self.current_manifold.num_cusps())
                 self.pq_iter = iter(self.all_pqs)
 
     def peek(self):

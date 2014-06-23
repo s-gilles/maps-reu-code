@@ -136,36 +136,25 @@ class MaskIterator:
         self.ctrue = 0
         self.switches = iter([[]])
 
+# Returns true/false list representation of the integer with desired length (padding falses)
+def get_bool_array(integer, length):
+    s = bin(integer)[2:]
+    if length < len(s): # Integer is too big
+        raise ValueError
+    o = [False]*length
+    for i in xrange(len(s)):
+        if s[-(i+1)] == '1':
+            o[-(i+1)] = True
+    return o
+    
+
 class FixedTorusBundleIterator:
-
-    def __init__(self,simplices,start=None):
+    # start_index is a positive integer equal to the input for get_bool_array to get the desired manifold
+    # valid values are 0 to 2**simplices - 1
+    # (probably actually 1 to 2**simplices - 2, but the extreme values will just be skipped naturally) 
+    def __init__(self,simplices,start_index=0):
         self.l = simplices
-        self.src = MaskIterator(simplices)
-        if start is not None:
-# Trouble is, it's not obvious how snappy wants these specified,
-# and moreover, some redundancy is certainly present.
-# So the only reliable way I can see is to iterate directly.
-# Partial implementation left in case this is later resolved.
-# Sorry :(
-#            try:
-#                nm = start.name()
-#                # Reverse the string construction that gave this manifold.
-#                targ = [False]*(len(nm)-4)
-#                if nm[2] is '-':
-#                    targ[0] = True
-#                elif nm[2] is not '+':
-#                    raise ValueError
-#                for idx in xrange(len(nm[4:])):
-#                    if ch is 'L':
-#                        targ[idx+1] =
-#                for b in self.src:
-            try:
-                while self.next().name() != start.name():
-                    pass
-            except StopIteration:
-                print 'Warning: tried to start iterator with non-output '+start.name()+'.'
-                self.src.reset()    # Act as if start = None
-
+        self.idx = start_index
 
     def __iter__(self):
         return self
@@ -174,8 +163,9 @@ class FixedTorusBundleIterator:
         while True:
             try:
                 try:
-                    bstr = self.src.next()
-                except StopIteration:
+                    bstr = get_bool_array(self.idx, self.l)
+                    self.idx += 1
+                except ValueError: # We must be done since idx >= 2**simplices
                     if default is not None:
                         return default
                     else:
@@ -195,6 +185,9 @@ class FixedTorusBundleIterator:
             except (IOError, AttributeError, ValueError): # In the rare case the string was invalid.
                 continue
         return out
+
+    def last_idx(self):
+        return idx - 1  # idx gets incremented in next() call before it is used
 
 class TorusBundleIterator:
     def __init__(self, start=2): # start may be int (number of simplices) or manifold

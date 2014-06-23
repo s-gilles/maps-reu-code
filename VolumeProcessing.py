@@ -43,8 +43,8 @@ class dataset:
         rec = self.data[poly][0][root].get(vol)
         del self.data[poly][0][root][vol]
         return rec
-    
-    # Combines this dataset with the dataset other; in case of a difference, other's values beat self's    
+
+    # Combines this dataset with the dataset other; in case of a difference, other's values beat self's
     def combine_with(self,other):
         self.update(other)
 
@@ -83,9 +83,9 @@ class dataset:
 
 # combines two output files from this program
 def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
-    dsets = list()    
+    dsets = list()
     for i in xrange(len(filenms)):
-        inf = open(filenms[i],'r')        
+        inf = open(filenms[i],'r')
         try:
             inf.readline()  # skip header
             dsets.append(read_csv(inf, seperator = fileseps[i]))
@@ -100,9 +100,9 @@ def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_
     write_csv(ouf, dsets[0], seperator = out_seperator, append = out_append)
 
 # read in raw csv in_file, pare and cull it, write it to out_file
-def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):    
+def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):
     inf = open(in_filenm,'r')
-    try:    
+    try:
         inf.readline()  # skip header
         d = read_raw_csv(inf, seperator = in_seperator)
     finally:

@@ -48,6 +48,39 @@ class dataset:
     def combine_with(self,other):
         self.update(other)
 
+    # Returns false if contents look very wrong (no x in polynomial slot, etc.)
+    # Only checks very shallowly for the first record data.__iter__.next() returns, so no guarantees
+    def sane(self):
+        try:
+            p = self.data.keys().__iter__().next()
+        except StopIteration:
+            return True # empty dataset is sane
+        if 'x' not in p:
+            return False
+        r = self.get_roots(p).__iter__().next()
+        if 'I' not in r and 'i' not in r:
+            return False
+        try:
+            if not is_int(float(self.get_degree(p))):
+                return False
+            if not is_int(float(self.get_ncp(p))):
+                return False
+            if not is_int(float(self.get_disc(p))):
+                return False
+            if '1' not in self.get_factored_disc(p) and '^' not in self.get_factored_disc(p):
+                return False
+            v = self.get_volumes(p,r).__iter__().next()
+            float(v)    # for the below
+        except ValueError:
+            return False    # something should have been a float and wasn't
+        m = self.get_manifold_data(p,r,v)
+        if m[0][0][-1] == ',':
+            return False    # probably a Dehn surgery got spliced
+        if not is_int(float(m[0][1])):
+            return False
+        # testing solution type would be annoying
+        return True
+
 # combines two output files from this program
 def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
     dsets = list()    
@@ -88,6 +121,39 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
 # Load a CSV file organized by manifold and reorganize it by polynomial and volume.
 # The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra, soltype), list (pared manifolds)), degree etc.)
 def read_raw_csv(in_file, seperator = ';'):
+    data = dict()
+    # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
+    for l in in_file.readlines():
+            if seperator == ',':    # special cased since ',' appears in Dehn surgery
+                w = re.findall('"([^"]*)"', l)
+            else:
+                w = l.replace('\n','').replace('"','').split(seperator)
+            # Since order got changed (for some unknown reason):
+            w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
+            # Incase the disc was 1, a temporary hack:
+            # if len(w) == 8:
+            #   w.append('')
+            # w[0]: manifold name ---------------------------> m[0] for m in data[poly][0][root][vol][0]
+            # w[1]: manifold simplices ----------------------> m[1] for m in data[poly][0][root][vol][0]
+            # w[2]: volume ----------------------------------> v in data[poly][0][root].keys()
+            # w[3]: invariant trace field polynomial --------> p in data.keys()
+            # w[4]: polynomial degree -----------------------> data[poly][1]
+            # w[5]: polynomial root -------------------------> r in data[poly][0].keys()
+            # w[6]: manifold solution type ------------------> m[2] for m in data[poly][0][root][vol][0]
+            # w[7]: polynomial number of complex places -----> data[poly][2]
+            # w[8]: polynomial discriminant -----------------> data[poly][3]
+            # w[9]: polynomial discriminant (factorized) ----> data[poly][4]
+            # vr = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[2],[list(),list(),w[5]])[0].append(w[0:2]) # OLD
+            # # why was vr set just now and not used?
+            vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
+            vol_entry[0].append((w[0],w[1],w[6]))
+            if len(data[w[3]]) == 2:
+                data[w[3]].extend(w[7:10])
+            # print data[w[3]][1:] # DEBUG
+    return dataset(data)
+
+# Reads csv from before the formatting change.
+def read_old_raw_csv(in_file, seperator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in in_file.readlines():
@@ -202,8 +268,8 @@ def cull_all_volumes(data):
             cull_volumes(data,p,r)
 
 def cull_volumes(data,poly,root):
-    # vols = data.get_volumes(poly,root)
-    vols = data.data[poly][0][root].keys()
+    vols = data.get_volumes(poly,root)
+    # vols = data.data[poly][0][root].keys()
     i = 0
     while i < len(vols) - 1:
         j = i + 1

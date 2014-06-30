@@ -146,15 +146,25 @@ def get_bool_array(integer, length):
         if s[-(i+1)] == '1':
             o[-(i+1)] = True
     return o
-    
+
+def something_new(bool_array):
+    x = list(bool_array)
+    for k in xrange(1, len(x)):
+        if len(x) % k == 0:
+            if x == x[:k] * (len(x)/k):
+                return False
+    return True
 
 class FixedTorusBundleIterator:
     # start_index is a positive integer equal to the input for get_bool_array to get the desired manifold
     # valid values are 0 to 2**simplices - 1
     # (probably actually 1 to 2**simplices - 2, but the extreme values will just be skipped naturally) 
-    def __init__(self,simplices,start_index=0):
+    # If skip = True, the iterator will skip integers that produce a multiple of some other volume with same or lesser word length.
+    # Testing for this may be expensive (who knows?), but cost probably grows slower than volume computation's.
+    def __init__(self, simplices, start_index=0, skip=False):
         self.l = simplices
         self.idx = start_index
+        self.skip = skip
 
     def __iter__(self):
         return self
@@ -165,7 +175,11 @@ class FixedTorusBundleIterator:
                 try:
                     bstr = get_bool_array(self.idx, self.l)
                     self.idx += 1
-                except ValueError: # We must be done since idx >= 2**simplices
+                    if self.skip:   # try some labor saving
+                        while not something_new([False]+bstr[1:]):
+                            bstr = get_bool_array(self.idx, self.l)
+                            self.idx += 1
+                except ValueError:  # We must be done since idx >= 2**simplices
                     if default is not None:
                         return default
                     else:
@@ -186,6 +200,7 @@ class FixedTorusBundleIterator:
                 continue
         return out
 
+
     # Note that this method does not account for the case where the last index was skipped because it produced a ValueError
     # This seems to happen whenever that index = 2**n or 2**n + 1
     # Note also that this and other last_foo methods are unreliable when next() has never been called.
@@ -193,9 +208,10 @@ class FixedTorusBundleIterator:
         return self.idx - 1  # idx gets incremented in next() call before it is used
 
 class TorusBundleIterator:
-    def __init__(self, start_length=2, start_idx=0):
+    def __init__(self, start_length=2, start_idx=0, skip = False):
         self.l = start_length
-        self.src = FixedTorusBundleIterator(self.l, start_index = start_idx)
+        self.skip = skip
+        self.src = FixedTorusBundleIterator(self.l, start_index = start_idx, skip = self.skip)
 
     def __iter__(self):
             return self
@@ -206,7 +222,7 @@ class TorusBundleIterator:
                 return self.src.next()
             except StopIteration:
                 self.l += 1
-                self.src = FixedTorusBundleIterator(self.l)
+                self.src = FixedTorusBundleIterator(self.l, skip = self.skip)
                 continue
 
     def last_idx(self):

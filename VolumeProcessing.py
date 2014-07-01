@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import re
+import sys
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
@@ -48,37 +49,71 @@ class dataset:
     def combine_with(self,other):
         self.update(other)
 
+    # Return a triplet containing data for the manifold of smallest volume with the given field
+    def get_representative_element(self, poly, root):
+        minvol = (None, float(sys.maxint))       
+        for v in self.get_volumes(poly,root):
+            try:
+                if float(v) < minvol[1] and 'geometric' in [rec[2] for rec in self.get_manifold_data(poly, root, v)]:
+                    minvol = (v, float(v))
+            except ValueError:
+                continue    # probably v=0+; doesn't really matter which we pick anyway
+        if minvol[0] is None:
+            return None # means no geometric solutions were found for this field
+        else:
+            for m in self.get_manifold_data(poly,root,minvol[0]):
+                if m[2] == 'geometric':
+                    return (minvol[0],m)
+                else:
+                    print('Warning: this should never be reached.') # DEBUG
+                    return None
+
+    def get_representative_dataset(self):
+        newdata = dict()
+        for poly in self.get_polys():
+            newdata[poly] = [dict()]+self.data[poly][1:]    # initialize list of volumes to be empty
+            for root in self.get_roots(poly):
+                md = self.get_representative_element(poly,root)
+                if md is not None:  # we actually have something geometric for this root
+                    newdata[poly][0][root] = {md[0] : [[md[1]],list()]}
+            if newdata[poly][0] == dict():  # no roots gave us geometric solutions
+                del newdata[poly]
+        return dataset(data_dict = newdata)
+
     # Returns false if contents look very wrong (no x in polynomial slot, etc.)
     # Only checks very shallowly for the first record data.__iter__.next() returns, so no guarantees
     def sane(self):
         try:
-            p = self.data.keys().__iter__().next()
-        except StopIteration:
-            return True # empty dataset is sane
-        if 'x' not in p:
-            return False
-        r = self.get_roots(p).__iter__().next()
-        if 'I' not in r and 'i' not in r:
-            return False
-        try:
-            if not is_int(float(self.get_degree(p))):
+            try:
+                p = self.data.keys().__iter__().next()
+            except StopIteration:
+                return True # empty dataset is sane
+            if 'x' not in p:
                 return False
-            if not is_int(float(self.get_ncp(p))):
+            r = self.get_roots(p).__iter__().next()
+            if 'I' not in r and 'i' not in r:
                 return False
-            if not is_int(float(self.get_disc(p))):
+            try:
+                if not is_int(float(self.get_degree(p))):
+                    return False
+                if not is_int(float(self.get_ncp(p))):
+                    return False
+                if not is_int(float(self.get_disc(p))):
+                    return False
+                if '1' not in self.get_factored_disc(p) and '^' not in self.get_factored_disc(p):
+                    return False
+                v = self.get_volumes(p,r).__iter__().next()
+                float(v)    # for the below
+            except ValueError:
+                return False    # something should have been a float and wasn't
+            m = self.get_manifold_data(p,r,v)
+            if m[0][0][-1] == ',':
+                return False    # probably a Dehn surgery got spliced
+            if not is_int(float(m[0][1])):
                 return False
-            if '1' not in self.get_factored_disc(p) and '^' not in self.get_factored_disc(p):
-                return False
-            v = self.get_volumes(p,r).__iter__().next()
-            float(v)    # for the below
-        except ValueError:
-            return False    # something should have been a float and wasn't
-        m = self.get_manifold_data(p,r,v)
-        if m[0][0][-1] == ',':
-            return False    # probably a Dehn surgery got spliced
-        if not is_int(float(m[0][1])):
-            return False
-        # testing solution type would be annoying
+            # testing solution type would be annoying
+        except:
+            return False    # unexpected errors probably mean we aren't sane
         return True
 
 # combines two output files from this program
@@ -201,7 +236,7 @@ def read_old_csv(in_file, seperator = ';'):
     return dataset(data)
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
-def read_csv(in_file, seperator = ';'): # HERE
+def read_csv(in_file, seperator = ';'):
     data = dict()
     for l in in_file.readlines():
         if seperator == ',':    # again special cased

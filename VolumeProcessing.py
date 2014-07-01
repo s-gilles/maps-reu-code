@@ -2,6 +2,8 @@
 
 import re
 
+from SpanFinder import find_span
+
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
 
@@ -290,6 +292,22 @@ def cull_volumes(data,poly,root):
             except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
                 j += 1
         i += 1
+
+def span_guesses(data):
+    spans = dict()
+    for poly in data.get_polys():
+        poly_dict = spans.setdefault(poly,dict())
+        ncp = data.get_ncp(poly)
+        try:
+            for root in data.get_roots(poly):
+                vols_full = [pari(v) for v in data.get_volumes(poly, root) if pari('abs(' + str(v) + '> 1e-10')]
+                try:
+                    poly_dict[root] = find_span(vols, int(ncp))
+                except:
+                    poly_dict[root] = ("Error [" + str(ncp) + "]", 0)
+        except:
+            pass
+    return spans
 
 def is_int(fl, epsilon = .0000000000001):
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon

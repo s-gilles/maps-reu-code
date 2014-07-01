@@ -35,6 +35,15 @@ class dataset:
     def get_volumes(self,poly,root):
         return self.data[poly][0][root].keys()
 
+    # returns a geometric manifold's record, or None failing that
+    def get_geom_manifold(self,poly,root,vol):
+        rec = (None,None,None)
+        for x in self.get_manifold_data(poly,root,vol):
+            if x[2] == 'geometric':
+                rec = x
+                break
+        return rec
+
     # Returns triplets of a manifold's name, number of simplices, and solution type
     def get_manifold_data(self,poly,root,vol):
         return self.data[poly][0][root][vol][0]
@@ -337,8 +346,9 @@ def span_guesses(data):
         ncp = data.get_ncp(poly)
         try:
             for root in data.get_roots(poly):
-                vols = [(gen.pari(v), "replace this with a call to get the manifold name") for v in data.get_volumes(poly, root) if gen.pari('abs(' + str(v) + ') > 1e-75')]
-                if not vols: # Sometimes we will only get tiny volumes. TODO: should the above really cull on 1e-75? Is that right?
+                vols = [(gen.pari(v),data.get_geom_manifold(poly,root,v)[0]) for v in data.get_volumes(poly, root)]
+                vols = [v for v in vols if v[1] is not None]
+                if not vols:
                     continue
                 if int(ncp) < 1:
                     continue

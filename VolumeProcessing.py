@@ -1,8 +1,10 @@
 #!/usr/bin/python
 
 import re
+import traceback
 
 from SpanFinder import find_span
+from cypari import *
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
@@ -300,12 +302,18 @@ def span_guesses(data):
         ncp = data.get_ncp(poly)
         try:
             for root in data.get_roots(poly):
-                vols_full = [pari(v) for v in data.get_volumes(poly, root) if pari('abs(' + str(v) + '> 1e-10')]
+                vols = [(gen.pari(v), "replace this with a call to get the manifold name") for v in data.get_volumes(poly, root) if gen.pari('abs(' + str(v) + ') > 1e-75')]
+                if not vols: # Sometimes we will only get tiny volumes. TODO: should the above really cull on 1e-75? Is that right?
+                    continue
+                if int(ncp) < 1:
+                    continue
                 try:
                     poly_dict[root] = find_span(vols, int(ncp))
-                except:
-                    poly_dict[root] = ("Error [" + str(ncp) + "]", 0)
-        except:
+                except ValueError as ve:
+                    poly_dict[root] = ("Error (" + str(ve) + ")", 0)
+        except Exception as e:
+            print(traceback.format_exc())
+            print(str(e))
             pass
     return spans
 

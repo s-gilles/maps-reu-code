@@ -1,6 +1,10 @@
 #!/usr/bin/python
 
 import re
+import traceback
+
+from SpanFinder import find_span
+from cypari import *
 import sys
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
@@ -48,37 +52,6 @@ class dataset:
     # Combines this dataset with the dataset other; in case of a difference, other's values beat self's
     def combine_with(self,other):
         self.update(other)
-
-    # Return a triplet containing data for the manifold of smallest volume with the given field
-    def get_representative_element(self, poly, root):
-        minvol = (None, float(sys.maxint))       
-        for v in self.get_volumes(poly,root):
-            try:
-                if float(v) < minvol[1] and 'geometric' in [rec[2] for rec in self.get_manifold_data(poly, root, v)]:
-                    minvol = (v, float(v))
-            except ValueError:
-                continue    # probably v=0+; doesn't really matter which we pick anyway
-        if minvol[0] is None:
-            return None # means no geometric solutions were found for this field
-        else:
-            for m in self.get_manifold_data(poly,root,minvol[0]):
-                if m[2] == 'geometric':
-                    return (minvol[0],m)
-                else:
-                    print('Warning: this should never be reached.') # DEBUG
-                    return None
-
-    def get_representative_dataset(self):
-        newdata = dict()
-        for poly in self.get_polys():
-            newdata[poly] = [dict()]+self.data[poly][1:]    # initialize list of volumes to be empty
-            for root in self.get_roots(poly):
-                md = self.get_representative_element(poly,root)
-                if md is not None:  # we actually have something geometric for this root
-                    newdata[poly][0][root] = {md[0] : [[md[1]],list()]}
-            if newdata[poly][0] == dict():  # no roots gave us geometric solutions
-                del newdata[poly]
-        return dataset(data_dict = newdata)
 
     # Returns false if contents look very wrong (no x in polynomial slot, etc.)
     # Only checks very shallowly for the first record data.__iter__.next() returns, so no guarantees
@@ -325,6 +298,28 @@ def cull_volumes(data,poly,root):
             except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
                 j += 1
         i += 1
+
+def span_guesses(data):
+    spans = dict()
+    for poly in data.get_polys():
+        poly_dict = spans.setdefault(poly,dict())
+        ncp = data.get_ncp(poly)
+        try:
+            for root in data.get_roots(poly):
+                vols = [(gen.pari(v), "replace this with a call to get the manifold name") for v in data.get_volumes(poly, root) if gen.pari('abs(' + str(v) + ') > 1e-75')]
+                if not vols: # Sometimes we will only get tiny volumes. TODO: should the above really cull on 1e-75? Is that right?
+                    continue
+                if int(ncp) < 1:
+                    continue
+                try:
+                    poly_dict[root] = find_span(vols, int(ncp))
+                except ValueError as ve:
+                    poly_dict[root] = ("Error (" + str(ve) + ")", 0)
+        except Exception as e:
+            print(traceback.format_exc())
+            print(str(e))
+            pass
+    return spans
 
 def is_int(fl, epsilon = .0000000000001):
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon

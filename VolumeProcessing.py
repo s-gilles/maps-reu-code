@@ -35,6 +35,10 @@ class dataset:
     def get_volumes(self,poly,root):
         return self.data[poly][0][root].keys()
 
+    # checks if a given polynomial has a record in this dataset
+    def has_poly(self,poly):
+        return poly in self.data.keys()
+
     # returns a geometric manifold's record, or None failing that
     def get_geom_manifold(self,poly,root,vol):
         rec = (None,None,None)
@@ -60,7 +64,7 @@ class dataset:
 
     # Combines this dataset with the dataset other; in case of a difference, other's values beat self's
     def combine_with(self,other):
-        self.update(other)
+        self.data.update(other.data)
 
     # Return a triplet containing data for the manifold of smallest volume with the given field
     def get_representative_element(self, poly, root):

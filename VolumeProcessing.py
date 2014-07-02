@@ -130,13 +130,13 @@ class dataset:
         return True
 
 # combines two output files from this program
-def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
+def quick_combine_files(filenms, fileseps, out_filenm, out_separator = ';', out_append = False):
     dsets = list()
     for i in xrange(len(filenms)):
         inf = open(filenms[i],'r')
         try:
             inf.readline()  # skip header
-            dsets.append(read_csv(inf, seperator = fileseps[i]))
+            dsets.append(read_csv(inf, separator = fileseps[i]))
         finally:
             inf.close()
     for d in dsets[1:]:
@@ -145,14 +145,14 @@ def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_
         ouf = open(out_filenm, 'a')
     else:
         ouf = open(out_filenm, 'w')
-    write_csv(ouf, dsets[0], seperator = out_seperator, append = out_append)
+    write_csv(ouf, dsets[0], separator = out_separator, append = out_append)
 
 # read in raw csv in_file, pare and cull it, write it to out_file
-def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):
+def quick_preprocess(in_filenm, out_filenm, in_separator = ';', out_separator = ';', out_append = False):
     inf = open(in_filenm,'r')
     try:
         inf.readline()  # skip header
-        d = read_raw_csv(inf, seperator = in_seperator)
+        d = read_raw_csv(inf, separator = in_separator)
     finally:
         inf.close()
     pare_all_volumes(d)
@@ -162,20 +162,23 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
     else:
         ouf = open(out_filenm,'w')
     try:
-        write_csv(ouf, d, seperator = out_seperator, append = out_append)
+        write_csv(ouf, d, separator = out_separator, append = out_append)
     finally:
         ouf.close()
 
 # Load a CSV file organized by manifold and reorganize it by polynomial and volume.
 # The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra, soltype), list (pared manifolds)), degree etc.)
-def read_raw_csv(in_file, seperator = ';'):
+def read_raw_csv_from_file(in_file, separator = ';'):
+    return _read_raw_csv(in_file.readlines(), separator)
+
+def read_raw_csv(contents, separator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
-    for l in in_file.readlines():
-            if seperator == ',':    # special cased since ',' appears in Dehn surgery
+    for l in contents:
+            if separator == ',':    # special cased since ',' appears in Dehn surgery
                 w = re.findall('"([^"]*)"', l)
             else:
-                w = l.replace('\n','').replace('"','').split(seperator)
+                w = l.replace('\n','').replace('"','').split(separator)
             # Since order got changed (for some unknown reason):
             w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
             # Incase the disc was 1, a temporary hack:
@@ -201,14 +204,14 @@ def read_raw_csv(in_file, seperator = ';'):
     return dataset(data)
 
 # Reads csv from before the formatting change.
-def read_old_raw_csv(in_file, seperator = ';'):
+def read_old_raw_csv(in_file, separator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in in_file.readlines():
-            if seperator == ',':    # special cased since ',' appears in Dehn surgery
+            if separator == ',':    # special cased since ',' appears in Dehn surgery
                 w = re.findall('"([^"]*)"', l)
             else:
-                w = l.replace('\n','').replace('"','').split(seperator)
+                w = l.replace('\n','').replace('"','').split(separator)
             # Since order got changed (for some unknown reason):
             w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
             # Incase the disc was 1, a temporary hack:
@@ -235,13 +238,13 @@ def read_old_raw_csv(in_file, seperator = ';'):
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
 # This variant handles csv's before we swapped column order around a bit.
-def read_old_csv(in_file, seperator = ';'):
+def read_old_csv(in_file, separator = ';'):
     data = dict()
     for l in in_file.readlines():
-        if seperator == ',':    # again special cased
+        if separator == ',':    # again special cased
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(seperator)
+            w = l.replace('\n','').replace('"','').split(separator)
         vol_entry = data.setdefault(w[0],[dict(),w[3]])[0].setdefault(w[1],dict()).setdefault(w[2],[list(),list()])
         vol_entry[0].append((w[7],w[8],w[9]))
         if len(data[w[0]]) == 2:
@@ -249,13 +252,13 @@ def read_old_csv(in_file, seperator = ';'):
     return dataset(data)
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
-def read_csv(in_file, seperator = ';'):
+def read_csv(in_file, separator = ';'):
     data = dict()
     for l in in_file.readlines():
-        if seperator == ',':    # again special cased
+        if separator == ',':    # again special cased
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(seperator)
+            w = l.replace('\n','').replace('"','').split(separator)
         vol_entry = data.setdefault(w[0],[dict(),w[3]])[0].setdefault(w[1],dict()).setdefault(w[2],[list(),list()])
         vol_entry[0].append((w[7],w[8],w[9]))
         if len(data[w[0]]) == 2:
@@ -265,17 +268,17 @@ def read_csv(in_file, seperator = ';'):
 
 # Writes a CSV file containing the mainfolds records as shown below.
 # Note that pared manifolds are currently ignored.
-def write_csv(out_file, dataset, seperator = ';', append=False):
+def write_csv(out_file, dataset, separator = ';', append=False):
     if not append:
-        out_file.write('Name'+seperator+
-                        'InvariantTraceField'+seperator+
-                        'Root'+seperator+
-                        'NumberOfComplexPlaces'+seperator+
-                        'Volume'+seperator+
-                        'InvariantTraceFieldDegree'+seperator+
-                        'SolutionType'+seperator+
-                        'Disc'+seperator+
-                        'Factored'+seperator+
+        out_file.write('Name'+separator+
+                        'InvariantTraceField'+separator+
+                        'Root'+separator+
+                        'NumberOfComplexPlaces'+separator+
+                        'Volume'+separator+
+                        'InvariantTraceFieldDegree'+separator+
+                        'SolutionType'+separator+
+                        'Disc'+separator+
+                        'Factored'+separator+
                         'Tetrahedra\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
         for r in dataset.get_roots(p):
@@ -285,15 +288,15 @@ def write_csv(out_file, dataset, seperator = ';', append=False):
             fact_disc = dataset.get_factored_disc(p)
             for v in dataset.get_volumes(p,r):
                 for m in dataset.get_manifold_data(p,r,v):
-                    out_file.write('"'+m[0]+'"'+seperator)
-                    out_file.write('"'+p+'"'+seperator)
-                    out_file.write('"'+r+'"'+seperator)
-                    out_file.write('"'+ncp+'"'+seperator)
-                    out_file.write('"'+v+'"'+seperator)
-                    out_file.write('"'+deg+'"'+seperator)
-                    out_file.write('"'+m[2]+'"'+seperator)
-                    out_file.write('"'+disc+'"'+seperator)
-                    out_file.write('"'+fact_disc+'"'+seperator)
+                    out_file.write('"'+m[0]+'"'+separator)
+                    out_file.write('"'+p+'"'+separator)
+                    out_file.write('"'+r+'"'+separator)
+                    out_file.write('"'+ncp+'"'+separator)
+                    out_file.write('"'+v+'"'+separator)
+                    out_file.write('"'+deg+'"'+separator)
+                    out_file.write('"'+m[2]+'"'+separator)
+                    out_file.write('"'+disc+'"'+separator)
+                    out_file.write('"'+fact_disc+'"'+separator)
                     out_file.write('"'+m[1]+'"\n')
 
 # Removes redundant manifold records with the same trace field (and root) and volume
@@ -339,7 +342,7 @@ def cull_volumes(data,poly,root):
                 j += 1
         i += 1
 
-def span_guesses(data):
+def _span_guesses(data):
     spans = dict()
     for poly in data.get_polys():
         poly_dict = spans.setdefault(poly,dict())
@@ -347,7 +350,7 @@ def span_guesses(data):
         try:
             for root in data.get_roots(poly):
                 vols = [(gen.pari(v),data.get_geom_manifold(poly,root,v)[0]) for v in data.get_volumes(poly, root)]
-                vols = [v for v in vols if v[1] is not None]
+                vols = [v for v in vols if v[1] is not None and gen.pari(str(v[0]) + ' > 0.9') ]
                 if not vols:
                     continue
                 if int(ncp) < 1:
@@ -355,7 +358,7 @@ def span_guesses(data):
                 try:
                     poly_dict[root] = find_span(vols, int(ncp))
                 except ValueError as ve:
-                    poly_dict[root] = ("Error (" + str(ve) + ")", 0)
+                    poly_dict[root] = ("Error (" + str(ve) + ")", 0, "Error")
         except Exception as e:
             print(traceback.format_exc())
             print(str(e))
@@ -365,11 +368,34 @@ def span_guesses(data):
 def is_int(fl, epsilon = .0000000000001):
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
+def write_spans(in_filenames, out_filename, separator = ';'):
+    lines = []
+    for f in in_filenames:
+        fi = open(f, 'r')
+        fi.readline()
+        lines.extend([l for l in fi.readlines()])
+        fi.close()
+    d = read_raw_csv(lines)
+    pare_all_volumes(d)
+    cull_all_volumes(d)
+    s = _span_guesses(d)
+    f = open(out_filename, 'w')
+    f.write('Polynomial' + separator + 'Root' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio\n')
+    for p,pd in s.items():
+        for r,re in pd.items():
+            if str(re[1]) != '0':
+                f.write('"' + str(p) + '"' + separator)
+                f.write('"' + str(r) + '"' + separator)
+                f.write('"' + str(re[0]) + '"' + separator)
+                f.write('"' + str(re[2]) + '"' + separator)
+                f.write('"' + str(re[1]) + '"\n')
+    f.close()
+
 # Test code
 if __name__ == '__main__':
     f = open('output.csv','r')
     f.readline() # skip header
-    d = read_raw_csv(f)
+    d = read_raw_csv_from_file(f)
     f.close()
     pare_all_volumes(d)
     cull_all_volumes(d)

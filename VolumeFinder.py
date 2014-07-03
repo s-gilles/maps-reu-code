@@ -440,6 +440,7 @@ Optional parameters:
     print('Working...')
 
     main_action = ACT_DISTRUBUTE_WORK
+    next_batch = iterator.next_batch()
     while True:
         if main_action is ACT_DIE:
             with _ready_manifolds.mutex:
@@ -469,8 +470,10 @@ Optional parameters:
             break
         elif main_action is ACT_DISTRUBUTE_WORK:
             try:
-                for m in iterator.next_batch():
+                for m in next_batch:
                     _ready_manifolds.put((m, None))
+                next_batch = iterator.next_batch()
+                main_action = ACT_COLLECT
             except StopIteration:
                 print('Done.')
                 main_action = ACT_COLLECT_THEN_DIE

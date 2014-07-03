@@ -346,7 +346,6 @@ def pqs_in_range(dehn_pq_limit, num_cusps):
         for q in range(0, dehn_pq_limit + 1):
             if abs(gcd(p,q)) <= 1:
                 pqs.append((p,q))
-    pqs.append(None)
 
     # pqs_mult = [ pqs, pqs, pqs... ]
     # because we wish to return pqs x pqs x pqs ... x pqs

@@ -71,8 +71,8 @@ class dataset:
                 new_data[p][0].setdefault(r,dict())
                 for v in other.get_volumes(p,r):
                     new_data[p][0][r].setdefault(v,[list(),list()])
-                    new_data[p][0][r][v][0].extend(other.get_manifold_data(p,r,v))
-                    new_data[p][0][r][v][1].extend(other.get_pared_manifolds(p,r,v))
+                    new_data[p][0][r][v][0] = list(set(new_data[p][0][r][v][0].extend(other.get_manifold_data(p,r,v))))
+                    new_data[p][0][r][v][1] = list(set(new_data[p][0][r][v][1].extend(other.get_pared_manifolds(p,r,v))))
         return dataset(data_dict = new_data)
 
     # Return a triplet containing data for the manifold of smallest volume with the given field

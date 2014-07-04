@@ -350,17 +350,17 @@ def _span_guesses(data):
     spans = dict()
     for poly in data.get_polys():
         poly_dict = spans.setdefault(poly,dict())
-        ncp = data.get_ncp(poly)
+        ncp = int(data.get_ncp(poly))
+        if ncp < 1:
+            continue
         try:
             for root in data.get_roots(poly):
                 vols = [(gen.pari(v),data.get_geom_manifold(poly,root,v)[0]) for v in data.get_volumes(poly, root)]
-                vols = [v for v in vols if v[1] is not None and gen.pari(str(v[0]) + ' > 0.9') ]
+                vols = [v for v in vols if gen.pari(str(v[0]) + ' > 0.9') ] #TODO: perhaps reinstate culling of non-geometric manifolds
                 if not vols:
                     continue
-                if int(ncp) < 1:
-                    continue
                 try:
-                    poly_dict[root] = find_span(vols, int(ncp))
+                    poly_dict[root] = find_span(vols, ncp)
                 except ValueError as ve:
                     poly_dict[root] = ("Error (" + str(ve) + ")", 0, "Error")
         except Exception as e:

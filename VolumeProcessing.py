@@ -352,7 +352,7 @@ def cull_volumes(data,poly,root):
         j = i + 1
         while j < len(vols):
             try:
-                if is_int(float(vols[i])/float(vols[j])):
+                if is_int(float(vols[i])/float(vols[j])) and gen.pari(vols[i] + ' > ' + vols[j]):
                     # TODO: if this ratio is 1 +- epsilon, we throw away names of manifolds here. This may not be desiredf
                     # [j] divides [i] so remove [i]
                     data.remove_volume(poly,root,vols.pop(i))

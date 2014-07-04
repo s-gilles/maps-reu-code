@@ -60,9 +60,18 @@ class dataset:
         del self.data[poly][0][root][vol]
         return rec
 
-    # Combines this dataset with the dataset other; in case of a difference, other's values beat self's
+    # Returns a dataset with the data from self and other; in case of a conflict, other's values beat self's or both are kept
     def combine_with(self,other):
-        self.data.update(other.data)
+        new_data = dict(self.data)
+        for p in other.get_polys():
+            new_data.setdefault(p,[dict(),other.get_degree(p),other.get_ncp(p),other.get_disc(p),other.get_factored_disc(p)])           
+            for r in other.get_roots(p):
+                new_data[p][0].setdefault(r,dict())
+                for v in other.get_volumes(p,r):
+                    new_data[p][0][r].setdefault(v,[list(),list()])
+                    new_data[p][0][r][v][0] = list(set(new_data[p][0][r][v][0].extend(other.get_manifold_data(p,r,v))))
+                    new_data[p][0][r][v][1] = list(set(new_data[p][0][r][v][1].extend(other.get_pared_manifolds(p,r,v))))
+        return dataset(data_dict = new_data)
 
     # Return a triplet containing data for the manifold of smallest volume with the given field
     def get_representative_element(self, poly, root):

@@ -238,6 +238,27 @@ class TorusBundleIterator:
         else:
             return self.l
 
+def get_torus_idx(man_nm):
+    nm = man_nm[2:] # assume that nothing before the sign matters
+    # Invert next (in the fixed iterator)
+    bits = list()
+    if nm[0] == '-':
+        bits += [True]
+    else:
+        bits += [False]
+    for x in nm[2:]:    # skip the fixed R, it makes no bit
+        if x == 'L':
+            bits += [True]
+        else:
+            bits += [False]
+    idx = 0
+    # Now, invert get_bool_array
+    for n in xrange(len(bits)):
+        if bits[-(n+1)]:
+            idx += 2**n
+    return idx
+    "b+-RLRRRRLLRRL(1,1)"
+
 class FixedDTIterator:
     # Set start to a manifold this iterator will later output, and the iterator
     # will skip to right after it.  That way, you can mark a place to return to

@@ -41,12 +41,10 @@ class dataset:
 
     # returns a geometric manifold's record, or None failing that
     def get_geom_manifold(self,poly,root,vol):
-        rec = (None,None,None)
-        for x in self.get_manifold_data(poly,root,vol):
-            if x[2] == 'geometric':
-                rec = x
-                break
-        return rec
+        try:
+            return self.data[poly][0][root][vol][0][0]
+        except:
+            return (None,None,None)
 
     # Returns triplets of a manifold's name, number of simplices, and solution type
     def get_manifold_data(self,poly,root,vol):
@@ -68,10 +66,10 @@ class dataset:
 
     # Return a triplet containing data for the manifold of smallest volume with the given field
     def get_representative_element(self, poly, root):
-        minvol = (None, float(sys.maxint))       
+        minvol = (None, sys.float_info.max)       
         for v in self.get_volumes(poly,root):
             try:
-                if float(v) < minvol[1] and 'geometric' in [rec[2] for rec in self.get_manifold_data(poly, root, v)]:
+                if float(v) < minvol[1]:
                     minvol = (v, float(v))
             except ValueError:
                 continue    # probably v=0+; doesn't really matter which we pick anyway
@@ -79,11 +77,7 @@ class dataset:
             return None # means no geometric solutions were found for this field
         else:
             for m in self.get_manifold_data(poly,root,minvol[0]):
-                if m[2] == 'geometric':
-                    return (minvol[0],m)
-                else:
-                    print('Warning: this should never be reached.') # DEBUG
-                    return None
+                return (minvol[0],m)
 
     def get_representative_dataset(self):
         newdata = dict()
@@ -133,6 +127,21 @@ class dataset:
             return False    # unexpected errors probably mean we aren't sane
         return True
 
+    # removes all manifolds from all volumes if they are anything but 'geometric'
+    def remove_non_geometric_elements(self):
+        to_kill = list()
+        for poly,polyinf in self.data.items():
+            polydict = polyinf[0]
+            for root,rootdict in polydict.items():
+                for vol,manifolds in rootdict.items():
+                    manifolds[0] = [ m for m in manifolds[0] if m[2] == 'geometric' ]
+                    if not manifolds[0]:
+                        to_kill.append((poly,root,vol))
+        for poly,root,vol in to_kill:
+            self.remove_volume(poly,root,vol)
+                        
+
+
 # combines two output files from this program
 def quick_combine_files(filenms, fileseps, out_filenm, out_separator = ';', out_append = False):
     dsets = list()
@@ -173,37 +182,41 @@ def quick_preprocess(in_filenm, out_filenm, in_separator = ';', out_separator = 
 # Load a CSV file organized by manifold and reorganize it by polynomial and volume.
 # The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra, soltype), list (pared manifolds)), degree etc.)
 def read_raw_csv_from_file(in_file, separator = ';'):
-    return _read_raw_csv(in_file.readlines(), separator)
+    return read_raw_csv(in_file.readlines(), separator)
 
 def read_raw_csv(contents, separator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in contents:
-            if separator == ',':    # special cased since ',' appears in Dehn surgery
-                w = re.findall('"([^"]*)"', l)
-            else:
-                w = l.replace('\n','').replace('"','').split(separator)
-            # Since order got changed (for some unknown reason):
-            w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
-            # Incase the disc was 1, a temporary hack:
-            # if len(w) == 8:
-            #   w.append('')
-            # w[0]: manifold name ---------------------------> m[0] for m in data[poly][0][root][vol][0]
-            # w[1]: manifold simplices ----------------------> m[1] for m in data[poly][0][root][vol][0]
-            # w[2]: volume ----------------------------------> v in data[poly][0][root].keys()
-            # w[3]: invariant trace field polynomial --------> p in data.keys()
-            # w[4]: polynomial degree -----------------------> data[poly][1]
-            # w[5]: polynomial root -------------------------> r in data[poly][0].keys()
-            # w[6]: manifold solution type ------------------> m[2] for m in data[poly][0][root][vol][0]
-            # w[7]: polynomial number of complex places -----> data[poly][2]
-            # w[8]: polynomial discriminant -----------------> data[poly][3]
-            # w[9]: polynomial discriminant (factorized) ----> data[poly][4]
-            # vr = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[2],[list(),list(),w[5]])[0].append(w[0:2]) # OLD
-            # # why was vr set just now and not used?
-            vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
-            vol_entry[0].append((w[0],w[1],w[6]))
-            if len(data[w[3]]) == 2:
-                data[w[3]].extend(w[7:10])
+
+        if separator == ',':    # special cased since ',' appears in Dehn surgery
+            w = re.findall('"([^"]*)"', l)
+        else:
+            w = l.replace('\n','').replace('"','').split(separator)
+
+        # Since order got changed (for some unknown reason):
+        w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
+        # Incase the disc was 1, a temporary hack:
+        # if len(w) == 8:
+        #   w.append('')
+        # w[0]: manifold name ---------------------------> m[0] for m in data[poly][0][root][vol][0]
+        # w[1]: manifold simplices ----------------------> m[1] for m in data[poly][0][root][vol][0]
+        # w[2]: volume ----------------------------------> v in data[poly][0][root].keys()
+        # w[3]: invariant trace field polynomial --------> p in data.keys()
+        # w[4]: polynomial degree -----------------------> data[poly][1]
+        # w[5]: polynomial root -------------------------> r in data[poly][0].keys()
+        # w[6]: manifold solution type ------------------> m[2] for m in data[poly][0][root][vol][0]
+        # w[7]: polynomial number of complex places -----> data[poly][2]
+        # w[8]: polynomial discriminant -----------------> data[poly][3]
+        # w[9]: polynomial discriminant (factorized) ----> data[poly][4]
+        # vr = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[2],[list(),list(),w[5]])[0].append(w[0:2]) # OLD
+        # # why was vr set just now and not used?
+        vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
+
+        vol_entry[0].append((w[0],w[1],w[6]))
+
+        if len(data[w[3]]) == 2:
+            data[w[3]].extend(w[7:10])
             # print data[w[3]][1:] # DEBUG
     return dataset(data)
 
@@ -212,10 +225,10 @@ def read_old_raw_csv(in_file, separator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in in_file.readlines():
-            if separator == ',':    # special cased since ',' appears in Dehn surgery
-                w = re.findall('"([^"]*)"', l)
-            else:
-                w = l.replace('\n','').replace('"','').split(separator)
+        if separator == ',':    # special cased since ',' appears in Dehn surgery
+            w = re.findall('"([^"]*)"', l)
+        else:
+            w = l.replace('\n','').replace('"','').split(separator)
             # Since order got changed (for some unknown reason):
             w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
             # Incase the disc was 1, a temporary hack:
@@ -331,6 +344,7 @@ def cull_volumes(data,poly,root):
         while j < len(vols):
             try:
                 if is_int(float(vols[i])/float(vols[j])):
+                    # TODO: if this ratio is 1 +- epsilon, we throw away names of manifolds here. This may not be desiredf
                     # [j] divides [i] so remove [i]
                     data.remove_volume(poly,root,vols.pop(i))
                     # i is already effectivley incremented, so we must offset it
@@ -356,7 +370,7 @@ def _span_guesses(data):
         try:
             for root in data.get_roots(poly):
                 vols = [(gen.pari(v),data.get_geom_manifold(poly,root,v)[0]) for v in data.get_volumes(poly, root)]
-                vols = [v for v in vols if gen.pari(str(v[0]) + ' > 0.9') ] #TODO: perhaps reinstate culling of non-geometric manifolds
+                vols = [v for v in vols if gen.pari(str(v[0]) + ' > 0.9') ]
                 if not vols:
                     continue
                 try:
@@ -380,6 +394,7 @@ def write_spans(in_filenames, out_filename, separator = ';'):
         lines.extend([l for l in fi.readlines()])
         fi.close()
     d = read_raw_csv(lines)
+    d.remove_non_geometric_elements()
     pare_all_volumes(d)
     cull_all_volumes(d)
     s = _span_guesses(d)

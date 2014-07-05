@@ -197,6 +197,7 @@ def read_raw_csv(contents, separator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in contents:
+        l = l.replace(' ', '')
 
         if separator == ',':    # special cased since ',' appears in Dehn surgery
             w = re.findall('"([^"]*)"', l)
@@ -226,39 +227,6 @@ def read_raw_csv(contents, separator = ';'):
 
         if len(data[w[3]]) == 2:
             data[w[3]].extend(w[7:10])
-            # print data[w[3]][1:] # DEBUG
-    return dataset(data)
-
-# Reads csv from before the formatting change.
-def read_old_raw_csv(in_file, separator = ';'):
-    data = dict()
-    # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
-    for l in in_file.readlines():
-        if separator == ',':    # special cased since ',' appears in Dehn surgery
-            w = re.findall('"([^"]*)"', l)
-        else:
-            w = l.replace('\n','').replace('"','').split(separator)
-            # Since order got changed (for some unknown reason):
-            w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
-            # Incase the disc was 1, a temporary hack:
-            # if len(w) == 8:
-            #   w.append('')
-            # w[0]: manifold name ---------------------------> m[0] for m in data[poly][0][root][vol][0]
-            # w[1]: manifold simplices ----------------------> m[1] for m in data[poly][0][root][vol][0]
-            # w[2]: volume ----------------------------------> v in data[poly][0][root].keys()
-            # w[3]: invariant trace field polynomial --------> p in data.keys()
-            # w[4]: polynomial degree -----------------------> data[poly][1]
-            # w[5]: polynomial root -------------------------> r in data[poly][0].keys()
-            # w[6]: manifold solution type ------------------> m[2] for m in data[poly][0][root][vol][0]
-            # w[7]: polynomial number of complex places -----> data[poly][2]
-            # w[8]: polynomial discriminant -----------------> data[poly][3]
-            # w[9]: polynomial discriminant (factorized) ----> data[poly][4]
-            # vr = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[2],[list(),list(),w[5]])[0].append(w[0:2]) # OLD
-            # # why was vr set just now and not used?
-            vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
-            vol_entry[0].append((w[0],w[1],w[6]))
-            if len(data[w[3]]) == 2:
-                data[w[3]].extend(w[7:10])
             # print data[w[3]][1:] # DEBUG
     return dataset(data)
 
@@ -408,12 +376,13 @@ def write_spans(in_filenames, out_filename, separator = ';'):
     cull_all_volumes(d)
     s = _span_guesses(d)
     f = open(out_filename, 'w')
-    f.write('Polynomial' + separator + 'Root' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio\n')
+    f.write('Polynomial' + separator + 'Root' + separator + 'SpanDimension' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio\n')
     for p,pd in s.items():
         for r,re in pd.items():
             if str(re[1]) != '0':
                 f.write('"' + str(p) + '"' + separator)
                 f.write('"' + str(r) + '"' + separator)
+                f.write('"' + str(len(re[0])) + '"' + separator)
                 f.write('"' + str(re[0]) + '"' + separator)
                 f.write('"' + str(re[2]) + '"' + separator)
                 f.write('"' + str(re[1]) + '"\n')

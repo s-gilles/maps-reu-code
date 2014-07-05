@@ -441,6 +441,7 @@ Optional parameters:
 
     main_action = ACT_DISTRUBUTE_WORK
     next_batch = iterator.next_batch()
+    last_pulled = next_batch[-1]
     while True:
         if main_action is ACT_DIE:
             with _ready_manifolds.mutex:
@@ -459,7 +460,7 @@ Optional parameters:
             have_written_out_already = True
             print('Wrote out current progress.')
             try:
-                print('That was for manifolds up to (possibly not including): ' + str(iterator.last()))
+                print('That was for manifolds up to (possibly not including): ' + str(last_pulled))
             except:
                 pass
             main_action = ACT_DISTRUBUTE_WORK
@@ -470,6 +471,7 @@ Optional parameters:
             break
         elif main_action is ACT_DISTRUBUTE_WORK:
             try:
+                last_pulled = next_batch[-1]
                 for m in next_batch:
                     _ready_manifolds.put((m, None))
                 next_batch = iterator.next_batch()

@@ -5,6 +5,19 @@ from snappy.database import OrientableCuspedCensus, HTLinkExteriors, LinkExterio
 from fractions import gcd
 from itertools import permutations, combinations, product
 
+# Skips the source iterator to after the given output
+class StartIterator:
+    def __init__(self,source,output):
+        self.source = source
+        while source.next() != output:
+            pass
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        return self.source.next()
+
 # Iterates through each element of 'sources' in order.
 class QueueIterator:
     def __init__(self,sources):

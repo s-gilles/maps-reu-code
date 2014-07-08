@@ -9,8 +9,12 @@ from itertools import permutations, combinations, product
 class StartIterator:
     def __init__(self,source,output):
         self.source = source
-        while source.next() != output:
-            pass
+        try:
+            while True:
+                if source.next() == output:
+                    break
+        except StopIteration:
+            pass    # This way we only throw StopIteration when next is called.
 
     def __iter__(self):
         return self

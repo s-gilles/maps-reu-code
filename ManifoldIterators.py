@@ -5,6 +5,9 @@ from snappy.database import OrientableCuspedCensus, HTLinkExteriors, LinkExterio
 from fractions import gcd
 from itertools import permutations, combinations, product
 
+# Default maximum number of strands in a braid; high numbers of strands tend to make snappy take forever.
+DEF_STRANDS = 4
+
 # Skips the source iterator to after the given output
 class StartIterator:
     def __init__(self,source,output):
@@ -345,6 +348,63 @@ class DTIterator:
             self.crossings += 1
             self.sub = FixedDTIterator(crossings)
             return self.sub.next()
+
+# Generates manifolds from braid words of a given word length and number of strands
+class FixedBraidIterator:
+
+    # Large values for strands can make computations take a very long time
+    def __init__(self, word_length, strands = DEF_STRANDS, start_idx = 0):
+        self.length = word_length
+        self.base = 2*strands - 1
+        self.max_pow = word_length - 2 
+        self.idx = start_idx
+        self.strands = strands
+        self.stop_idx = self.base**(self.max_pow + 1) # only need to compute this once
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.idx >= self.stop_idx:
+            raise StopIteration
+        word = [1]
+        power = self.max_pow
+        rem = self.idx
+        while power >= 0:
+            place = self.base**power
+            word.append(rem//place) # get the next digit
+            rem = rem % place       # get ready to recurse
+            power -= 1
+        for n in xrange(1,len(word)):
+            word[n] -= self.strands     # make range -n to n-2 instead of 0 to 2n-1
+            if word[n] >= 0:            # now -n to -1 and 1 to n-1 
+                word[n] += 1
+            if word[n] >= -1*word[n-1]: # bump up to avoid ...n,-n... which would cancel out; now -n to -1 and 1 to n
+                word[n] += 1
+            if word[n] == 0:            # what if word[n-1] = 1 and we just sent -1 to 0?
+                word[n] = 1
+        self.idx += 1    # increment after we work
+        return Manifold('Braid:'+str(word).replace(' ',''))
+        
+# Generates manifolds from braids with a given number of strands
+class BraidIterator:
+
+    # Large values for strands can make computations take a very long time
+    def __init__(self, start_length=2, strands = DEF_STRANDS, start_idx=0):
+        self.length = start_length
+        self.source = FixedBraidIterator(self.length, start_idx = start_idx)
+        self.strands = strands
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        try:
+            return self.source.next()
+        except StopIteration:
+            self.length += 1
+            self.source = FixedBraidIterator(self.length, strands = self.strands)
+            return self.next()
 
 # A simple generator for all manifolds in OrientableCuspedCensus,
 # LinkExteriors, HTLinkExteriors

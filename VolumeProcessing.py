@@ -61,6 +61,7 @@ class dataset:
         return rec
 
     # Returns a dataset with the data from self and other; in case of a conflict, other's values beat self's or both are kept
+    # Therefore, one is advised to use this on disjoint datasets or pare volumes afterwards
     def combine_with(self,other):
         new_data = dict(self.data)
         for p in other.get_polys():
@@ -69,8 +70,10 @@ class dataset:
                 new_data[p][0].setdefault(r,dict())
                 for v in other.get_volumes(p,r):
                     new_data[p][0][r].setdefault(v,[list(),list()])
-                    new_data[p][0][r][v][0] = list(set(new_data[p][0][r][v][0].extend(other.get_manifold_data(p,r,v))))
-                    new_data[p][0][r][v][1] = list(set(new_data[p][0][r][v][1].extend(other.get_pared_manifolds(p,r,v))))
+                    new_data[p][0][r][v][0].extend(other.get_manifold_data(p,r,v))
+                    new_data[p][0][r][v][1].extend(other.get_pared_manifolds(p,r,v))
+                    for dim in new_data[p][0][r][v]:
+                        dim = list(set(dim))    # Remove duplicates.
         return dataset(data_dict = new_data)
 
     # Return a triplet containing data for the manifold of smallest volume with the given field
@@ -148,6 +151,12 @@ class dataset:
                         to_kill.append((poly,root,vol))
         for poly,root,vol in to_kill:
             self.remove_volume(poly,root,vol)
+        for p in self.get_polys():  # These blank parts probably do no harm, but just to be sure...
+            for r in self.get_roots(p):
+                if not self.get_volumes(p,r):
+                    del self.data[p][0][r]
+            if not self.get_roots(p):
+                del self.data[p]
                         
 
 

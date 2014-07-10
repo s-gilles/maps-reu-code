@@ -381,7 +381,7 @@ class FixedBraidIterator:
                 word[n] += 1
             if word[n] >= -1*word[n-1]: # bump up to avoid ...n,-n... which would cancel out; now -n to -1 and 1 to n
                 word[n] += 1
-            if word[n] == 0:            # what if word[n-1] = 1 and we just sent -1 to 0?
+            if word[n] == 0:            # what if word[n-1] >= 1 and we just sent -1 to 0?
                 word[n] = 1
         self.idx += 1    # increment after we work
         return Manifold('Braid:'+str(word).replace(' ',''))
@@ -405,6 +405,29 @@ class BraidIterator:
             self.length += 1
             self.source = FixedBraidIterator(self.length, strands = self.strands)
             return self.next()
+
+# Returns the index used to generate a given braid with the given number of strands.
+def get_braid_idx(man_nm, strands = DEF_STRANDS):
+    if man_nm[:6] != 'Braid:':  # make sure input is valid
+        raise ValueError
+    digits = [int(x) for x in man_nm[6:].replace(' ','').strip('[]').split(',')]    # cut off first digit
+    orig = list()
+    for n in xrange(1,len(digits)):
+        res = digits[n]
+        if res > -1*digits[n-1]:  # reverse bumping up to avoid -last
+            res -= 1
+            if res == 0:
+                res -= 1
+        if res >= 1:  # reverse bumping up to avoid 0
+            res -= 1
+        res += strands  # reverse shifting to -strands , strands-2
+        orig.append(res)
+    base = 2*strands - 1    
+    idx = 0
+    for n in xrange(len(orig)):
+        idx += orig[-(n+1)] * (base**n)
+    return idx
+    
 
 # A simple generator for all manifolds in OrientableCuspedCensus,
 # LinkExteriors, HTLinkExteriors

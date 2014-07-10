@@ -262,10 +262,10 @@ def read_csv(in_file, separator = ';'):
             w = re.findall('"([^"]*)"', l)
         else:
             w = l.replace('\n','').replace('"','').split(separator)
-        vol_entry = data.setdefault(w[0],[dict(),w[3]])[0].setdefault(w[1],dict()).setdefault(w[2],[list(),list()])
-        vol_entry[0].append((w[7],w[8],w[9]))
-        if len(data[w[0]]) == 2:
-            data[w[0]].extend(w[4:7])
+        vol_entry = data.setdefault(w[1],[dict(),w[5]])[0].setdefault(w[2],dict()).setdefault(w[4],[list(),list()])
+        vol_entry[0].append((w[0],w[9],w[6]))
+        if len(data[w[1]]) == 2:
+            data[w[1]].extend([w[3],w[7],w[8]])
     return dataset(data)
 
 
@@ -330,7 +330,7 @@ def cull_volumes(data,poly,root):
         while j < len(vols):
             try:
                 if is_int(float(vols[i])/float(vols[j])) and gen.pari(vols[i] + ' > ' + vols[j]):
-                    # TODO: if this ratio is 1 +- epsilon, we throw away names of manifolds here. This may not be desiredf
+                    # TODO: if this ratio is 1 +- epsilon, we throw away names of manifolds here. This may not be desired
                     # [j] divides [i] so remove [i]
                     data.remove_volume(poly,root,vols.pop(i))
                     # i is already effectivley incremented, so we must offset it

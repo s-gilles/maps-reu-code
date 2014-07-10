@@ -30,11 +30,9 @@ Optionally, the parameter cutoff may be passed (defaulting to 4096). This contro
     for i in range(0, len(independent_elts)):
         vol, name = independent_elts[i] # gen.pari(independent_elts[i])
         if not rational_basis:
-            vec = [0] * n
-            vec[next_pure_basis_element_position] = 1
-            next_pure_basis_element_position += 1
+            next_pure_basis_element_position = 1
             rational_basis = [vol]
-            rational_vectors = [(vol,gen.pari(vec).mattranspose(),name)]
+            rational_vectors = [(vol,gen.pari([1]).mattranspose(),name)]
         else:
             test_vec = rational_basis[:]
             test_vec.insert(0, vol)
@@ -52,30 +50,27 @@ Optionally, the parameter cutoff may be passed (defaulting to 4096). This contro
                                      ', and attempting to fit volume ' + str(vol) +
                                      ' into them determined it should be classed as a new basis element, but there are already ' +
                                      str(n) + ' such!')
-                vec = [0] * n
+                vec = [0] * (next_pure_basis_element_position + 1)
                 vec[next_pure_basis_element_position] = 1
                 next_pure_basis_element_position += 1
+                rational_vectors = [ (c_p,c_v.concat(gen.pari([0])),c_n) for c_p,c_v,c_n in rational_vectors ]
                 rational_basis.append(vol)
                 rational_vectors.append((vol,gen.pari(vec).mattranspose(),name))
             else:
                 # This volume is a rational combination of the selected basis
                 # elements. Use it.
                 vec = - lindep_results[1:] / lindep_results[0]
-                while len(vec) < n:
-                    vec = vec.concat(0)
+                while len(vec) < next_pure_basis_element_position:
+                    vec = vec.concat(gen.pari([0]))
                 rational_vectors.append((vol,vec.mattranspose(),name))
 
-    if len(rational_basis) != n:
-        raise ValueError('Found a rational basis ' + str(rational_basis) +
-                         ', but this has ' + str(len(rational_basis)) +
-                         ' elements, whereas ' + str(n) + ' were expected.')
-
     # Now rational_vectors is a python list containing pari row vectors representing each elt. Get dets and such
+    determined_n = next_pure_basis_element_position # if there is less data than ncp, keep going
     det_gcd = None
     min_det = None
     min_det_elts = None
     min_det_names = None
-    for mat_tuple in itertools.combinations(rational_vectors, n):
+    for mat_tuple in itertools.combinations(rational_vectors, determined_n):
         mat_elts = [vec for vol,vec,name in list(mat_tuple)]
         names = [name for vol,vec,name in list(mat_tuple)]
         mat = mat_elts[0]

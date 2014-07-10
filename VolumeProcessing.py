@@ -350,7 +350,11 @@ def _span_guesses(data):
     spans = dict()
     for poly in data.get_polys():
         poly_dict = spans.setdefault(poly,dict())
-        ncp = int(data.get_ncp(poly))
+        ncp = 0
+        try:
+            ncp = int(data.get_ncp(poly))
+        except ValueError:
+            print('Some kind of problem with ncp ' + str(data.get_ncp(poly)) + "\n")
         if ncp < 1:
             continue
         try:
@@ -385,11 +389,12 @@ def write_spans(in_filenames, out_filename, separator = ';'):
     cull_all_volumes(d)
     s = _span_guesses(d)
     f = open(out_filename, 'w')
-    f.write('Polynomial' + separator + 'Root' + separator + 'SpanDimension' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio\n')
+    f.write('Polynomial' + separator + 'NumberOfComplexPlaces' + separator + 'Root' + separator + 'SpanDimension' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio\n')
     for p,pd in s.items():
         for r,re in pd.items():
             if str(re[1]) != '0':
                 f.write('"' + str(p) + '"' + separator)
+                f.write('"' + str(d.get_ncp(p)) + '"' + separator)
                 f.write('"' + str(r) + '"' + separator)
                 f.write('"' + str(len(re[0])) + '"' + separator)
                 f.write('"' + str(re[0]) + '"' + separator)

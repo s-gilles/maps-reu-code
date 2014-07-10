@@ -91,7 +91,7 @@ class dataset:
             for m in self.get_manifold_data(poly,root,minvol[0]):
                 return (minvol[0],m)
 
-    def get_representative_dataset(self):
+    def get_representative_dataset(self):   # TODO: make these support paring properly
         newdata = dict()
         for poly in self.get_polys():
             newdata[poly] = [dict()]+self.data[poly][1:]    # initialize list of volumes to be empty
@@ -157,7 +157,16 @@ class dataset:
                     del self.data[p][0][r]
             if not self.get_roots(p):
                 del self.data[p]
-                        
+
+    # Currently returns the shortest choice; could be made more sophisticated
+    def get_nice_manifold_name(self,poly,root,vol):
+        nms = [rec[0] for rec in self.get_manifold_data(poly,root,vol)]
+        nms.extend(self.get_pared_manifolds(poly,root,vol))
+        opt = ('', sys.float_info.max)
+        for nm in nms:
+            if len(nm) < opt[1]:
+                opt = (nm,len(nm))
+        return opt[0]
 
 
 # combines two output files from this program
@@ -255,23 +264,33 @@ def read_old_csv(in_file, separator = ';'):
     return dataset(data)
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
-def read_csv(in_file, separator = ';'):
+def read_csv(in_file, separator = ';', sub_seperator = '|'):
     data = dict()
     for l in in_file.readlines():
         if separator == ',':    # again special cased
             w = re.findall('"([^"]*)"', l)
         else:
             w = l.replace('\n','').replace('"','').split(separator)
+        if len(w) == 10:    # pared manifolds weren't supported when this csv was written out
+            w.append('')    # acceptable substitute
         vol_entry = data.setdefault(w[1],[dict(),w[5]])[0].setdefault(w[2],dict()).setdefault(w[4],[list(),list()])
         vol_entry[0].append((w[0],w[9],w[6]))
+        vol_entry[1].extend(w[10].split(sub_seperator))
+        vol_entry[1] = list(set(vol_entry[1]))  # remove duplicates
         if len(data[w[1]]) == 2:
             data[w[1]].extend([w[3],w[7],w[8]])
     return dataset(data)
 
+# Returns the list as a string with the given seperator and no brackets
+def list_str(lst,sep):
+    ret = '['
+    for x in lst:
+        ret += str(x)+sep
+    return ret[:-1*len(sep)]    # remove extra seperator
 
 # Writes a CSV file containing the mainfolds records as shown below.
 # Note that pared manifolds are currently ignored.
-def write_csv(out_file, dataset, separator = ';', append=False):
+def write_csv(out_file, dataset, separator = ';', sub_seperator = '|', append=False):
     if not append:
         out_file.write('Name'+separator+
                         'InvariantTraceField'+separator+
@@ -282,7 +301,8 @@ def write_csv(out_file, dataset, separator = ';', append=False):
                         'SolutionType'+separator+
                         'Disc'+separator+
                         'Factored'+separator+
-                        'Tetrahedra\n')
+                        'Tetrahedra'+seperator+
+                        'ParedManifolds'+'\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
         for r in dataset.get_roots(p):
             deg = dataset.get_degree(p)
@@ -300,7 +320,8 @@ def write_csv(out_file, dataset, separator = ';', append=False):
                     out_file.write('"'+m[2]+'"'+separator)
                     out_file.write('"'+disc+'"'+separator)
                     out_file.write('"'+fact_disc+'"'+separator)
-                    out_file.write('"'+m[1]+'"\n')
+                    out_file.write('"'+m[1]+seperator)
+                    out_file.write('"'+list_str(dataset.get_pared_manifolds(p,r,v),sub_seperator).replace(' ','')+'"\n')
 
 # Removes redundant manifold records with the same trace field (and root) and volume
 def pare_all_volumes(data):
@@ -309,7 +330,7 @@ def pare_all_volumes(data):
             for v in data.get_volumes(p,r):
                 pare_volume(data,p,r,v)
 
-def pare_volume(data,poly,root,vol):
+def pare_volume(data,poly,root,vol): # TODO: make this have a little (rounding) error tolerance
     mdata = data.get_manifold_data(poly,root,vol)
     mpared = data.get_pared_manifolds(poly,root,vol)
     while len(mdata) > 1:
@@ -330,7 +351,7 @@ def cull_volumes(data,poly,root):
         while j < len(vols):
             try:
                 if is_int(float(vols[i])/float(vols[j])) and gen.pari(vols[i] + ' > ' + vols[j]):
-                    # TODO: if this ratio is 1 +- epsilon, we throw away names of manifolds here. This may not be desired
+                    # We have to throw away (culled) manifold names to let all culled manifolds have the same volume
                     # [j] divides [i] so remove [i]
                     data.remove_volume(poly,root,vols.pop(i))
                     # i is already effectivley incremented, so we must offset it

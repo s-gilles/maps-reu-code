@@ -175,6 +175,35 @@ def something_new(bool_array):
                 return False
     return True
 
+# Randomizes each manifold in man_iter up to max_tries times to get a geometric solution, then gives up and moves on 
+class RandomIterator:
+    def __init__(self, man_iter, max_tries = 16):  
+        self.source = man_iter
+        self.max_tries = max_tries
+        self.failures = list()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        man = self.source.next()
+        oman = man.copy()
+        tries = 0
+        while oman.solution_type(enum = True) != 1:
+            oman = oman.randomize()
+            tries += 1
+            if tries == self.max_tries:
+                self.failures.apppend(man)
+                man = self.source.next()
+                oman = man.copy()
+                tries = 0
+        return oman
+
+    # Gives a list of the manifolds that we couldn't make geometric.
+    def get_failures(self):
+        return self.failures
+        
+
 class FixedTorusBundleIterator:
     # start_index is a positive integer equal to the input for get_bool_array to get the desired manifold
     # valid values are 0 to 2**simplices - 1

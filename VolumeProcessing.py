@@ -91,7 +91,7 @@ class dataset:
             for m in self.get_manifold_data(poly,root,minvol[0]):
                 return (minvol[0],m)
 
-    def get_representative_dataset(self):   # TODO: make these support paring properly
+    def get_representative_dataset(self):
         newdata = dict()
         for poly in self.get_polys():
             newdata[poly] = [dict()]+self.data[poly][1:]    # initialize list of volumes to be empty

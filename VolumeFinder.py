@@ -273,6 +273,7 @@ def compute_shape_fields(idx, temp_file_dir):
                 _snap_process[idx] = kickoff_snap(temp_file_dir)
                 continue
 
+        times_retried = 0
         while True:
             snap_output = snap_output + drain(_snap_process[idx].stdout)
             if RE_INV_TRACE_FIELD_NOT_FOUND.match(snap_output):
@@ -316,11 +317,18 @@ def compute_shape_fields(idx, temp_file_dir):
                     # All the information to be sent back from the threads is packed in a tuple:
                     by_volume.append((manifold,ncp,root, sol_type))
                 break
-            time.sleep(0.05)
+            time.sleep(0.5)
             try:
                 snap_output = snap_output + send_cmd(_snap_process[idx], '')
             except IOError:
                 # Force the next RE_ERROR.match to trigger
+                snap_output = 'Error'
+
+            # This happens extremely rarely, but occasionally snap
+            # will simply hang.  E.g. computing invariant trace field
+            # for 10^3_3(-1,8)(1,3)(1,3)
+            times_retried += 1
+            if times_retried > 20:
                 snap_output = 'Error'
 
         _ready_manifolds.task_done()

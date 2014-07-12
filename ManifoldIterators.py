@@ -193,7 +193,7 @@ class RandomIterator:
             oman = oman.randomize()
             tries += 1
             if tries == self.max_tries:
-                self.failures.apppend(man)
+                self.failures.append(man)
                 man = self.source.next()
                 oman = man.copy()
                 tries = 0

@@ -483,7 +483,9 @@ def _span_guesses(data):
 def is_int(fl, epsilon = EPSILON):
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
-def write_spans(in_filenames, out_filename, seperator = ';'):
+def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
+    if type(in_filenames) is str: # support laziness
+        in_filenames = [in_filenames]
     lines = []
     for f in in_filenames:
         fi = open(f, 'r')
@@ -494,8 +496,22 @@ def write_spans(in_filenames, out_filename, seperator = ';'):
     d.remove_non_geometric_elements()
     pare_all_volumes(d)
     cull_all_volumes(d)
+    write_spans(out_filename, d, seperator = out_seperator)
+    
+
+def read_spans(fname, seperator = ';'):
+    f = open(fname,'r')
+    f.readline()
+    spans = dict()
+    for l in f.readlines():
+        w = l.replace('"','').strip('\n').split(seperator)
+        spans.setdefault(w[0],dict())[w[2]] = w[4:]    # with any luck, this is only set once
+    return spans
+
+def write_spans(fname, dataset, seperator = ';'):
+    d = dataset # lazy    
     s = _span_guesses(d)
-    f = open(out_filename, 'w')
+    f = open(fname, 'w')
     f.write('Polynomial' + seperator + 'NumberOfComplexPlaces' + seperator + 'Root' + seperator + 'SpanDimension' + seperator + 'VolumeSpan' + seperator + 'ManifoldSpan' + seperator + 'FitRatio\n')
     for p,pd in s.items():
         for r,re in pd.items():

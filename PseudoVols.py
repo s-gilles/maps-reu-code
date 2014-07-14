@@ -22,7 +22,16 @@ def get_volume_data(man_nms, engine = 'magma', retrieve = True):
         for k in recs.keys():   # remove duplicates
             recs[k] = list(set(recs[k]))
     return VolumeData(data = recs)
-        
+
+def get_potential_trace_fields(poly):
+    pol = pari(poly)
+    return [str(rec[0]) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
+
+def _binmiss(s,l):
+    while s < l:
+        s *= 2
+    return s == l
+
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
 

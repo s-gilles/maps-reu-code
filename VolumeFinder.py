@@ -182,6 +182,7 @@ def kickoff_snap(temp_file_dir):
     send_cmd(cprocess, 'set precision 10\n')
     send_cmd(cprocess, 'set digits_printed 100 f\n')
     send_cmd(cprocess, 'set degree 8\n')
+    send_cmd(cprocess, 'set simplify false\n')
     send_cmd(cprocess, 'set path ' + temp_file_dir + '\n')
     return cprocess
 

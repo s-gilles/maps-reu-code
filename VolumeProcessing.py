@@ -7,6 +7,8 @@ import traceback
 from SpanFinder import find_span
 from cypari import *
 
+EPSILON = .0000000000001
+
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
 
@@ -91,7 +93,7 @@ class dataset:
             for m in self.get_manifold_data(poly,root,minvol[0]):
                 return (minvol[0],m)
 
-    def get_representative_dataset(self):   # TODO: make these support paring properly
+    def get_representative_dataset(self):
         newdata = dict()
         for poly in self.get_polys():
             newdata[poly] = [dict()]+self.data[poly][1:]    # initialize list of volumes to be empty
@@ -164,19 +166,95 @@ class dataset:
         nms.extend(self.get_pared_manifolds(poly,root,vol))
         opt = ('', sys.float_info.max)
         for nm in nms:
-            if len(nm) < opt[1]:
+            if len(nm) < opt[1]:    # TODO: finish _niceness and replace len with it
                 opt = (nm,len(nm))
         return opt[0]
 
+def _niceness(nm):
+    n = 0.0
+    k = nm[0]
+    if k == 'm':
+        n += 0
+    elif k == 'v':
+        n += 1
+    elif k == 't':
+        n += 2
+    elif k == 'o':
+        n += 3
+    elif k == 'K':  # TODO: apply knot and link # penalties
+        n += 4
+    elif k == 'L':
+        n += 5
+    elif k == 'b':
+        n += 6
+    elif k == 'B':
+        n += 7
+    elif k == 'D':
+        n += 8
+    else:
+        n += 10
+    # n *= gap TODO
+    # apply dehn penalties TODO
+    return n
+
+    # If some volumes differ by less than epsilon, combine them, keeping one of them arbitrarily.
+    # Slightly nondeterministic; may not get large, dense (compared to epsilon) clumps if iteration order is unfavorable.
+    # But that is very unlikely to happen,
+    # and when it is (lattice generators very close to each other) you don't want smush to work anyway
+    # Only usefull if you don't want to cull;
+    # Only briefly tested
+    def smush_volumes(self, epsilon = EPSILON):
+        balls = list()        
+        for p in self.get_polys():
+            for r in self.get_roots(p):
+                vol_data = self.data[p][0][r]
+                balls = list()
+                vols = list(vol_data.keys())
+                for v in vols:  # find close volumes
+                    for w in [w for w in vols if w is not v]:
+                        if abs(float(w)-float(v)) < epsilon:
+                            balls.append(set([v,w]))
+                def _br(balls): # combine balls by finding graph components
+                    for b in balls:
+                        for u in [u for u in balls if u is not b]:
+                            if not b.isdisjoint(u):
+                                balls.remove(b)
+                                balls.remove(u)
+                                balls.append(b.union(u))
+                                return True # acted, might have more to do; to avoid mutation errors...
+                    return False
+                while _br(balls):           # ...do this
+                    pass
+                for b in balls: # combine data for each volume into one
+                    nrec = [list(),list()]
+                    n = 0
+                    for v in b:
+                        nrec[0].extend(vol_data[v][0])  # Hopefully there should be no duplicates in this case.
+                        nrec[1].extend(vol_data[v][1])
+                        del vol_data[v]
+                    vol_data[v] = nrec  # bit of an abuse of v
+                    
+
+def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
+    try:    
+        f = open(filenm,'r')
+        f.readline()
+        d = read_csv(f, seperator = seperator, sub_seperator = sub_seperator)
+        f.close()
+        return d
+    except:
+        f.close()
+        raise
+        
 
 # combines two output files from this program
-def quick_combine_files(filenms, fileseps, out_filenm, out_separator = ';', out_append = False):
+def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
     dsets = list()
     for i in xrange(len(filenms)):
         inf = open(filenms[i],'r')
         try:
             inf.readline()  # skip header
-            dsets.append(read_csv(inf, separator = fileseps[i]))
+            dsets.append(read_csv(inf, seperator = fileseps[i]))
         finally:
             inf.close()
     for d in dsets[1:]:
@@ -185,14 +263,14 @@ def quick_combine_files(filenms, fileseps, out_filenm, out_separator = ';', out_
         ouf = open(out_filenm, 'a')
     else:
         ouf = open(out_filenm, 'w')
-    write_csv(ouf, dsets[0], separator = out_separator, append = out_append)
+    write_csv(ouf, dsets[0], seperator = out_seperator, append = out_append)
 
 # read in raw csv in_file, pare and cull it, write it to out_file
-def quick_preprocess(in_filenm, out_filenm, in_separator = ';', out_separator = ';', out_append = False):
+def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):
     inf = open(in_filenm,'r')
     try:
         inf.readline()  # skip header
-        d = read_raw_csv(inf, separator = in_separator)
+        d = read_raw_csv(inf, seperator = in_seperator)
     finally:
         inf.close()
     pare_all_volumes(d)
@@ -202,25 +280,25 @@ def quick_preprocess(in_filenm, out_filenm, in_separator = ';', out_separator = 
     else:
         ouf = open(out_filenm,'w')
     try:
-        write_csv(ouf, d, separator = out_separator, append = out_append)
+        write_csv(ouf, d, seperator = out_seperator, append = out_append)
     finally:
         ouf.close()
 
 # Load a CSV file organized by manifold and reorganize it by polynomial and volume.
 # The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra, soltype), list (pared manifolds)), degree etc.)
-def read_raw_csv_from_file(in_file, separator = ';'):
-    return read_raw_csv(in_file.readlines(), separator)
+def read_raw_csv_from_file(in_file, seperator = ';'):
+    return read_raw_csv(in_file.readlines(), seperator)
 
-def read_raw_csv(contents, separator = ';'):
+def read_raw_csv(contents, seperator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in contents:
         l = l.replace(' ', '')
 
-        if separator == ',':    # special cased since ',' appears in Dehn surgery
+        if seperator == ',':    # special cased since ',' appears in Dehn surgery
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(separator)
+            w = l.replace('\n','').replace('"','').split(seperator)
 
         # Since order got changed (for some unknown reason):
         w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
@@ -250,13 +328,13 @@ def read_raw_csv(contents, separator = ';'):
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
 # This variant handles csv's before we swapped column order around a bit.
-def read_old_csv(in_file, separator = ';'):
+def read_old_csv(in_file, seperator = ';'):
     data = dict()
     for l in in_file.readlines():
-        if separator == ',':    # again special cased
+        if seperator == ',':    # again special cased
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(separator)
+            w = l.replace('\n','').replace('"','').split(seperator)
         vol_entry = data.setdefault(w[0],[dict(),w[3]])[0].setdefault(w[1],dict()).setdefault(w[2],[list(),list()])
         vol_entry[0].append((w[7],w[8],w[9]))
         if len(data[w[0]]) == 2:
@@ -264,13 +342,13 @@ def read_old_csv(in_file, separator = ';'):
     return dataset(data)
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
-def read_csv(in_file, separator = ';', sub_seperator = '|'):
+def read_csv(in_file, seperator = ';', sub_seperator = '|'):
     data = dict()
     for l in in_file.readlines():
-        if separator == ',':    # again special cased
+        if seperator == ',':    # again special cased
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(separator)
+            w = l.replace('\n','').replace('"','').split(seperator)
         if len(w) == 10:    # pared manifolds weren't supported when this csv was written out
             w.append('')    # acceptable substitute
         vol_entry = data.setdefault(w[1],[dict(),w[5]])[0].setdefault(w[2],dict()).setdefault(w[4],[list(),list()])
@@ -290,17 +368,17 @@ def list_str(lst,sep):
 
 # Writes a CSV file containing the mainfolds records as shown below.
 # Note that pared manifolds are currently ignored.
-def write_csv(out_file, dataset, separator = ';', sub_seperator = '|', append=False):
+def write_csv(out_file, dataset, seperator = ';', sub_seperator = '|', append=False):
     if not append:
-        out_file.write('Name'+separator+
-                        'InvariantTraceField'+separator+
-                        'Root'+separator+
-                        'NumberOfComplexPlaces'+separator+
-                        'Volume'+separator+
-                        'InvariantTraceFieldDegree'+separator+
-                        'SolutionType'+separator+
-                        'Disc'+separator+
-                        'Factored'+separator+
+        out_file.write('Name'+seperator+
+                        'InvariantTraceField'+seperator+
+                        'Root'+seperator+
+                        'NumberOfComplexPlaces'+seperator+
+                        'Volume'+seperator+
+                        'InvariantTraceFieldDegree'+seperator+
+                        'SolutionType'+seperator+
+                        'Disc'+seperator+
+                        'Factored'+seperator+
                         'Tetrahedra'+seperator+
                         'ParedManifolds'+'\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
@@ -311,17 +389,25 @@ def write_csv(out_file, dataset, separator = ';', sub_seperator = '|', append=Fa
             fact_disc = dataset.get_factored_disc(p)
             for v in dataset.get_volumes(p,r):
                 for m in dataset.get_manifold_data(p,r,v):
-                    out_file.write('"'+m[0]+'"'+separator)
-                    out_file.write('"'+p+'"'+separator)
-                    out_file.write('"'+r+'"'+separator)
-                    out_file.write('"'+ncp+'"'+separator)
-                    out_file.write('"'+v+'"'+separator)
-                    out_file.write('"'+deg+'"'+separator)
-                    out_file.write('"'+m[2]+'"'+separator)
-                    out_file.write('"'+disc+'"'+separator)
-                    out_file.write('"'+fact_disc+'"'+separator)
+                    out_file.write('"'+m[0]+'"'+seperator)
+                    out_file.write('"'+p+'"'+seperator)
+                    out_file.write('"'+r+'"'+seperator)
+                    out_file.write('"'+ncp+'"'+seperator)
+                    out_file.write('"'+v+'"'+seperator)
+                    out_file.write('"'+deg+'"'+seperator)
+                    out_file.write('"'+m[2]+'"'+seperator)
+                    out_file.write('"'+disc+'"'+seperator)
+                    out_file.write('"'+fact_disc+'"'+seperator)
                     out_file.write('"'+m[1]+seperator)
                     out_file.write('"'+list_str(dataset.get_pared_manifolds(p,r,v),sub_seperator).replace(' ','')+'"\n')
+
+def quick_write_csv(dataset, filenm, seperator = ';', sub_seperator = '|', append = False):
+    try:    
+        f = open(filenm,'w')
+        write_csv(f, dataset, seperator = seperator, sub_seperator = sub_seperator, append = append)
+    except:
+        f.close()
+        raise
 
 # Removes redundant manifold records with the same trace field (and root) and volume
 def pare_all_volumes(data):
@@ -330,7 +416,7 @@ def pare_all_volumes(data):
             for v in data.get_volumes(p,r):
                 pare_volume(data,p,r,v)
 
-def pare_volume(data,poly,root,vol): # TODO: make this have a little (rounding) error tolerance
+def pare_volume(data,poly,root,vol): # TODO: move these 4 methods into the class
     mdata = data.get_manifold_data(poly,root,vol)
     mpared = data.get_pared_manifolds(poly,root,vol)
     while len(mdata) > 1:
@@ -394,10 +480,12 @@ def _span_guesses(data):
             pass
     return spans
 
-def is_int(fl, epsilon = .0000000000001):
+def is_int(fl, epsilon = EPSILON):
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
-def write_spans(in_filenames, out_filename, separator = ';'):
+def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
+    if type(in_filenames) is str: # support laziness
+        in_filenames = [in_filenames]
     lines = []
     for f in in_filenames:
         fi = open(f, 'r')
@@ -408,18 +496,32 @@ def write_spans(in_filenames, out_filename, separator = ';'):
     d.remove_non_geometric_elements()
     pare_all_volumes(d)
     cull_all_volumes(d)
+    write_spans(out_filename, d, seperator = out_seperator)
+    
+
+def read_spans(fname, seperator = ';'):
+    f = open(fname,'r')
+    f.readline()
+    spans = dict()
+    for l in f.readlines():
+        w = l.replace('"','').strip('\n').split(seperator)
+        spans.setdefault(w[0],dict())[w[2]] = w[4:]    # with any luck, this is only set once
+    return spans
+
+def write_spans(fname, dataset, seperator = ';'):
+    d = dataset # lazy    
     s = _span_guesses(d)
-    f = open(out_filename, 'w')
-    f.write('Polynomial' + separator + 'NumberOfComplexPlaces' + separator + 'Root' + separator + 'SpanDimension' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio\n')
+    f = open(fname, 'w')
+    f.write('Polynomial' + seperator + 'NumberOfComplexPlaces' + seperator + 'Root' + seperator + 'SpanDimension' + seperator + 'VolumeSpan' + seperator + 'ManifoldSpan' + seperator + 'FitRatio\n')
     for p,pd in s.items():
         for r,re in pd.items():
             if str(re[1]) != '0':
-                f.write('"' + str(p) + '"' + separator)
-                f.write('"' + str(d.get_ncp(p)) + '"' + separator)
-                f.write('"' + str(r) + '"' + separator)
-                f.write('"' + str(len(re[0])) + '"' + separator)
-                f.write('"' + str(re[0]) + '"' + separator)
-                f.write('"' + str(re[2]) + '"' + separator)
+                f.write('"' + str(p) + '"' + seperator)
+                f.write('"' + str(d.get_ncp(p)) + '"' + seperator)
+                f.write('"' + str(r) + '"' + seperator)
+                f.write('"' + str(len(re[0])) + '"' + seperator)
+                f.write('"' + str(re[0]) + '"' + seperator)
+                f.write('"' + str(re[2]) + '"' + seperator)
                 f.write('"' + str(re[1]) + '"\n')
     f.close()
 

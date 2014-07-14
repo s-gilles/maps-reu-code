@@ -190,10 +190,10 @@ class RandomIterator:
         oman = man.copy()
         tries = 0
         while oman.solution_type(enum = True) != 1:
-            oman = oman.randomize()
+            oman.randomize()
             tries += 1
             if tries == self.max_tries:
-                self.failures.apppend(man)
+                self.failures.append(man)
                 man = self.source.next()
                 oman = man.copy()
                 tries = 0

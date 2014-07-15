@@ -29,7 +29,11 @@ def get_volume_data(man_nms, engine = 'magma', retrieve = True):
 
 def get_potential_trace_fields(poly):
     pol = pari(poly)
-    return [str(rec[0]) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
+    try:
+        return [str(rec[0]) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
+    except: # we want cypari.gen.PariError, but no idea how to reference; fortunately, anything else will just raise again
+        pol = pol.polredabs()
+        return get_potential_trace_fields(str(pol))
 
 def _binmiss(s,l):
     while s < l:

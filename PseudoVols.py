@@ -35,7 +35,7 @@ def _binmiss(s,l):
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
 
-    # structure: dict poly ---> list of (volume, manifold)
+    # structure: dict poly ---> list of (volume, manifold, ?fitted)
     def __init__(self, data = dict()):
         self.data = data
 

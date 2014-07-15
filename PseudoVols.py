@@ -71,7 +71,10 @@ class VolumeData:
     def write_to_csv(self, output_file, seperator = ';', append = False):
         try:
             if type(output_file) == str:
-                f = open(output_file,'w')
+                if append:
+                    f = open(output_file,'a')
+                else:
+                    f = open(output_file,'w')
             else:
                 f = output_file
             f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+'\n')

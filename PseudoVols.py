@@ -77,7 +77,8 @@ class VolumeData:
                     f = open(output_file,'w')
             else:
                 f = output_file
-            f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+'\n')
+            if not append:
+                f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+'\n')
             for p in self.get_polys():
                 for rec in self.get_volume_data(p):
                     f.write('"'+p+'"'+seperator)

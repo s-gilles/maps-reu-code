@@ -3,11 +3,17 @@
 import re
 import sys
 import traceback
+import fractions
 
+from numpy.linalg import det
 from SpanFinder import find_span
+from PseudoVols import *
 from cypari import *
+from fractions import Fraction
+from itertools import combinations
 
 EPSILON = .0000000000001
+MAX_COEFF = 4096
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
@@ -524,6 +530,155 @@ def write_spans(fname, dataset, seperator = ';'):
                 f.write('"' + str(re[2]) + '"' + seperator)
                 f.write('"' + str(re[1]) + '"\n')
     f.close()
+
+# Manages interfacing with a dictionary containing the spans.
+# There are two possible forms:
+# poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
+# poly : root : [[spanning_vols], fit_ratio, [spanning_names], [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
+# The latter form is used after deciding to fit some pseudovols (as a VolumeData) against a SpanData;
+# Doing so produces a VolumeData of those pseudovols we just couldn't fit, which can be written out as usual 
+class SpanData:
+
+    def __init__(self, data_dict, fails_dict = None):
+        self.data = data_dict
+        if data_dict:
+            p = data_dict.keys().__iter__().next()
+            r = data_dict[p].keys().__iter__().next()  # this really shouldn't fail
+            s = len(data_dict[p][r])
+            if s != 3 and s != 6:
+                print data_dict[p][r]   # DEBUG
+                raise ValueError    # input looks wack
+            self.fitted = (s == 6)  # records if we are in the second form described above
+        else:
+            self.fitted = False
+        self.fit_fails = None
+        if fails_dict:
+            self.fit_fails = fails_dict
+        elif self.fitted:
+            self.fit_fails = dict()
+        for p in data_dict.keys():  # got to reformat
+            for r in data_dict[p].keys():
+                data_dict[p][r] = list(data_dict[p][r])
+
+    def get_polys(self):
+        return self.data.keys()
+
+    def get_roots(self, poly):
+        return self.data[poly].keys()
+
+    def get_spans(self, poly, root):
+        return self.data[poly][root][:3]
+
+    def get_pseudo_data(self, poly, root):
+        return self.data[poly][root][3:]
+
+    def fit(self, voldata, maxcoeff = MAX_COEFF):
+        if not self.fitted:
+            self.fitted = True
+            if not self.fit_fails:
+                self.fit_fails = dict()
+        for p in voldata.get_polys():
+            data = voldata.get_volume_data(p)
+            for rec in data:
+                def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
+                    if len(self.data[p][r]) == 3:
+                        self.data[p][r].extend([list(),0,list()])
+                def _fit(p,rec):      # this exists to break multiple layers
+                    cand = None     # previous best fit
+                    for tf in get_potential_trace_fields(p):
+                        tf = tf.replace(' ','')
+                        if tf in self.get_polys():
+                            print 'Found '+tf+' in the spans.'  # DEBUG
+                            for r in self.get_roots(tf):
+                                if 'Error' in self.data[tf][r]: # can't handle the format (TODO?)
+                                    continue                    # so we skip this one
+                                ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff)
+                                if ldp and ldp[-1] != 0:
+                                    if abs(ldp[-1]) == 1:    # the match was perfect, update the data
+                                        _fresz(tf,r)
+                                        self.data[tf][r][3].append(rec)
+                                        return
+                                    else:   # the match was imperfect, maybe a better fit awaits
+                                        if not cand or cand[1] > ldp[-1]:   # better than previous best fit
+                                            cand = ((tf,r),ldp[-1])
+                        else:
+                            print 'No '+tf+' in the spans.'     # DEBUG
+                    if cand:    # have a rational but not integral fit
+                        _fresz(cand[0][0],cand[0][1])
+                        self.data[cand[0][0]][cand[0][1]][5].append(rec)
+                    else:       # no rational fit, store the failure
+                        self.fit_fails.setdefault(p,list()).append(rec)
+                _fit(p,rec)
+        for p in self.get_polys():      # got to recalc psuedo fit ratios
+            for r in self.get_roots(p):
+                if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play
+                    if self.data[p][r][5]:  # take gcd using basis vectors and pseudo vols; hopefully equivalent by linear algebra TODO: verify
+                        dim = len(self.data[p][r][0])
+                        vecs = list()                    
+                        for n in xrange(dim):   # put in basis unit vectors
+                            vecs.append([0]*dim)
+                            vecs[n][n] = 1
+                        for v in [rec[0] for rec in self.data[p][r][5]]:    # put in vectors for non-integral combinations
+                            pldp = _pari_lindep(self.data[p][r][0]+[v])
+                            vecs.append([Fraction(numerator = -1*x, denominator = pldp[-1]) for x in pldp[:-1]])
+                        dets = list()
+                        for c in combinations(vecs,dim):
+                            try:    # DEBUG
+                                dets.append(abs(det(c)))
+                            except: # DEBUG
+                                print c     # All DEBUG...
+                                print vecs
+                                print dim
+                                print self.data[p][r][0]
+                                print self.data[p][r][5]
+                                raise   # End DEBUG
+                        self.data[p][r][4] = _gcd([Fraction(d) for d in dets])
+                    else:   # all volumes fit integrally, so
+                        self.data[p][r][4] = 1
+
+    # Returns a dict poly : (volume, manifold, False) of manifolds that couldn't be fitted in the spans.
+    def get_fit_failures(self):
+        return self.fit_fails
+
+# returns a SpanData for the given dataset                                    
+def get_data_object(dset):
+    return SpanData(_span_guesses(dset))
+
+# Accepts volumes as strings since we store them that way.
+# Returns the dependancy found (if any) as a list of integers if all coefficents are <= maxcoeff or maxcoeff is nonpositive;
+# otherwise, it returns []
+def _pari_lindep(str_vols, maxcoeff = MAX_COEFF):
+    vols = list(str_vols)   # in case someone sent some other type collection
+    try:    # DEBUG
+        vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
+    except Exception as e: # DEBUG...
+        print vols
+        print str_vols
+        print e
+        raise e # end DEBUG
+    if not vec or vec == ['']: # no input; TODO implement more elegantly
+        return list()
+    o = [int(v) for v in vec]
+    if maxcoeff > 0:
+        for x in o:
+            if x > maxcoeff:
+                o = list()
+                break
+    return o
+
+def _lcm(a,b):
+    return (a*b)/fractions.gcd(a,b) # gcd * lcm = a * b
+
+# Hilariously, python's fractions.gcd does not accept Fractions or handle their floats correctly
+def _gcd(fracts):
+    denom = 1
+    for q in fracts:
+        denom = _lcm(denom, q.denominator)   # our denominator should be lcm of input denominators
+    nums = [(q.numerator*denom)/q.denominator for q in fracts]  # create common denominator
+    num = nums[0]
+    for n in nums [1:]:
+        nums = fractions.gcd(num,n) # our numerator should be gcd of input (same denom) numerators
+    return Fraction(numerator = num, denominator = denom)
 
 # Test code
 if __name__ == '__main__':

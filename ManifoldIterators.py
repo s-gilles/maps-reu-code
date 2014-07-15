@@ -8,6 +8,17 @@ from itertools import permutations, combinations, product
 # Default maximum number of strands in a braid; high numbers of strands tend to make snappy take forever.
 DEF_STRANDS = 4
 
+# This iterator applies a given funct to source.next() before returning it.
+class ForwardingIterator:
+    def __init__(self,source,funct):
+        self.source = source
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        return str(self.source.next())
+
 # Skips the source iterator to after the given output
 class StartIterator:
     def __init__(self,source,output):

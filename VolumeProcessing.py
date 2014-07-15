@@ -572,6 +572,50 @@ class SpanData:
     def get_pseudo_data(self, poly, root):
         return self.data[poly][root][3:]
 
+    # Given a valid filename or open, write-ready file object, writes our data out to it.
+    def write_to_csv(self, outfile, dset, seperator = ';', append = False):
+        if type(outfile) == str:
+            if append:
+                f = open(outfile,'a')
+            else:
+                f = open(outfile,'w')
+        else:
+            f = outfile
+        try:
+            if not append:
+                f.write('Polynomial' + seperator + 'NumberOfComplexPlaces' + seperator + 'Root' + seperator + 'SpanDimension' + seperator + 'VolumeSpan' + seperator + 'ManifoldSpan' + seperator + 'FitRatio')
+                if self.fitted:
+                    f.write(seperator + 'SolvedPseudoVolumes' + seperator + 'SolvedNames' + seperator + 'UnsolvedPseudoVolumes' + seperator + 'UnsolvedNames' + seperator + 'PseudoFitRatio')
+                f.write('\n')
+            for p in self.get_polys():
+                for r in self.get_roots(p):
+                    re = self.data[p][r]
+                    f.write('"' + str(p) + '"' + seperator)
+                    f.write('"' + str(dset.get_ncp(p)) + '"' + seperator)
+                    f.write('"' + str(r) + '"' + seperator)
+                    f.write('"' + str(len(re[0])) + '"' + seperator)
+                    f.write('"' + str(re[0]) + '"' + seperator)
+                    f.write('"' + str(re[2]) + '"' + seperator)
+                    f.write('"' + str(re[1]) + '"')
+                    if self.fitted:
+                        f.write(seperator)
+                        if len(re) == 6:
+                            f.write('"' + str([t[0] for t in re[3]]) + '"' + seperator)
+                            f.write('"' + str([t[1] for t in re[3]]) + '"' + seperator)
+                            f.write('"' + str([t[0] for t in re[5]]) + '"' + seperator)
+                            f.write('"' + str([t[1] for t in re[5]]) + '"' + seperator)
+                            f.write('"' + str(re[4]) + '"')
+                        else:
+                            f.write('"None"' + seperator)
+                            f.write('"None"' + seperator)
+                            f.write('"None"' + seperator)
+                            f.write('"None"' + seperator)
+                            f.write('"1"')
+                    f.write('\n')
+        finally:
+            if type(outfile) == str:
+                f.close()
+
     def fit(self, voldata, maxcoeff = MAX_COEFF):
         if not self.fitted:
             self.fitted = True

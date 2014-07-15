@@ -680,9 +680,29 @@ class SpanData:
                     else:   # all volumes fit integrally, so
                         self.data[p][r][4] = 1
 
-    # Returns a dict poly : (volume, manifold, False) of manifolds that couldn't be fitted in the spans.
+    # Returns a dict poly : (volume, manifold) of manifolds that couldn't be fitted in the spans.
     def get_fit_failures(self):
         return self.fit_fails
+
+    def write_failures(self, outfile, seperator = ';', append = False):
+        if type(outfile) == str:
+            if append:
+                f = open(outfile,'a')
+            else:
+                f = open(outfile,'w')
+        else:
+            f = outfile
+        try:
+            if not append:
+                f.write('TraceField' + seperator + 'Volume' + seperator + 'Manifold\n')
+            for p in self.fit_fails:
+                for rec in self.fit_fails[p]:
+                    f.write('"'+str(p)+'"'+seperator)
+                    f.write('"'+str(rec[0])+'"'+seperator)
+                    f.write('"'+str(rec[1])+'"\n')
+        finally:
+            if type(outfile) == str:
+                f.close()
 
 # returns a SpanData for the given dataset                                    
 def get_data_object(dset):

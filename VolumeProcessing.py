@@ -329,7 +329,6 @@ def read_raw_csv(contents, seperator = ';'):
 
         if len(data[w[3]]) == 2:
             data[w[3]].extend(w[7:10])
-            # print data[w[3]][1:] # DEBUG
     return dataset(data)
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
@@ -546,7 +545,6 @@ class SpanData:
             r = data_dict[p].keys().__iter__().next()  # this really shouldn't fail
             s = len(data_dict[p][r])
             if s != 3 and s != 6:
-                print data_dict[p][r]   # DEBUG
                 raise ValueError    # input looks wack
             self.fitted = (s == 6)  # records if we are in the second form described above
         else:
@@ -632,7 +630,6 @@ class SpanData:
                     for tf in get_potential_trace_fields(p):
                         tf = tf.replace(' ','')
                         if tf in self.get_polys():
-                            print 'Found '+tf+' in the spans.'  # DEBUG
                             for r in self.get_roots(tf):
                                 if 'Error' in self.data[tf][r]: # can't handle the format (TODO?)
                                     continue                    # so we skip this one
@@ -645,8 +642,6 @@ class SpanData:
                                     else:   # the match was imperfect, maybe a better fit awaits
                                         if not cand or cand[1] > ldp[-1]:   # better than previous best fit
                                             cand = ((tf,r),ldp[-1])
-                        else:
-                            print 'No '+tf+' in the spans.'     # DEBUG
                     if cand:    # have a rational but not integral fit
                         _fresz(cand[0][0],cand[0][1])
                         self.data[cand[0][0]][cand[0][1]][5].append(rec)
@@ -667,15 +662,7 @@ class SpanData:
                             vecs.append([Fraction(numerator = -1*x, denominator = pldp[-1]) for x in pldp[:-1]])
                         dets = list()
                         for c in combinations(vecs,dim):
-                            try:    # DEBUG
-                                dets.append(abs(det(c)))
-                            except: # DEBUG
-                                print c     # All DEBUG...
-                                print vecs
-                                print dim
-                                print self.data[p][r][0]
-                                print self.data[p][r][5]
-                                raise   # End DEBUG
+                            dets.append(abs(det(c)))
                         self.data[p][r][4] = _gcd([Fraction(d) for d in dets])
                     else:   # all volumes fit integrally, so
                         self.data[p][r][4] = 1
@@ -713,13 +700,7 @@ def get_data_object(dset):
 # otherwise, it returns []
 def _pari_lindep(str_vols, maxcoeff = MAX_COEFF):
     vols = list(str_vols)   # in case someone sent some other type collection
-    try:    # DEBUG
-        vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
-    except Exception as e: # DEBUG...
-        print vols
-        print str_vols
-        print e
-        raise e # end DEBUG
+    vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
     if not vec or vec == ['']: # no input; TODO implement more elegantly
         return list()
     o = [int(v) for v in vec]

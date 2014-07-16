@@ -615,6 +615,31 @@ class SpanData:
                 f.close()
 
     def fit(self, voldata, maxcoeff = MAX_COEFF):
+        def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
+            if len(self.data[p][r]) == 3:
+                self.data[p][r].extend([list(),0,list()])
+        def _fit(p,rec):      # this exists to break multiple layers
+            cand = None     # previous best fit
+            for tf in get_potential_trace_fields(p):
+                tf = tf.replace(' ','')
+                if tf in self.get_polys():
+                    for r in self.get_roots(tf):
+                        if 'Error' in self.data[tf][r]: # can't handle the format (TODO?)
+                            continue                    # so we skip this one
+                        ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff)
+                        if ldp and ldp[-1] != 0:
+                            if abs(ldp[-1]) == 1:    # the match was perfect, update the data
+                                _fresz(tf,r)
+                                self.data[tf][r][3].append(rec)
+                                return
+                            else:   # the match was imperfect, maybe a better fit awaits
+                                if not cand or cand[1] > ldp[-1]:   # better than previous best fit
+                                    cand = ((tf,r),ldp[-1])
+            if cand:    # have a rational but not integral fit
+                _fresz(cand[0][0],cand[0][1])
+                self.data[cand[0][0]][cand[0][1]][5].append(rec)
+            else:       # no rational fit, store the failure
+                self.fit_fails.setdefault(p,list()).append(rec)
         if not self.fitted:
             self.fitted = True
             if not self.fit_fails:
@@ -622,31 +647,6 @@ class SpanData:
         for p in voldata.get_polys():
             data = voldata.get_volume_data(p)
             for rec in data:
-                def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
-                    if len(self.data[p][r]) == 3:
-                        self.data[p][r].extend([list(),0,list()])
-                def _fit(p,rec):      # this exists to break multiple layers
-                    cand = None     # previous best fit
-                    for tf in get_potential_trace_fields(p):
-                        tf = tf.replace(' ','')
-                        if tf in self.get_polys():
-                            for r in self.get_roots(tf):
-                                if 'Error' in self.data[tf][r]: # can't handle the format (TODO?)
-                                    continue                    # so we skip this one
-                                ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff)
-                                if ldp and ldp[-1] != 0:
-                                    if abs(ldp[-1]) == 1:    # the match was perfect, update the data
-                                        _fresz(tf,r)
-                                        self.data[tf][r][3].append(rec)
-                                        return
-                                    else:   # the match was imperfect, maybe a better fit awaits
-                                        if not cand or cand[1] > ldp[-1]:   # better than previous best fit
-                                            cand = ((tf,r),ldp[-1])
-                    if cand:    # have a rational but not integral fit
-                        _fresz(cand[0][0],cand[0][1])
-                        self.data[cand[0][0]][cand[0][1]][5].append(rec)
-                    else:       # no rational fit, store the failure
-                        self.fit_fails.setdefault(p,list()).append(rec)
                 _fit(p,rec)
         for p in self.get_polys():      # got to recalc psuedo fit ratios
             for r in self.get_roots(p):

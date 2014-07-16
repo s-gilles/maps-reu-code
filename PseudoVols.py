@@ -3,6 +3,9 @@
 from snappy import *
 from ManifoldIterators import *
 
+# Until this gets globalized
+pari.set_real_precision(100)
+
 # The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
 # except output will be written out every period manifolds and logs generated, instead of all at once.
 def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', retrieve = True, period = 100, seperator = ';'):

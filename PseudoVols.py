@@ -2,26 +2,30 @@
 
 from snappy import *
 
-# Returns a VolumeData object for manifolds with the given names
+# Returns a VolumeData object containing exotic volumes for manifolds with the given names
 # Volumes' precision is based on pari, so set it there
+# set engine = None to skip computing the volumes
 def get_volume_data(man_nms, engine = 'magma', retrieve = True):
     recs = dict()
     for nm in man_nms:
         try:
+            sols = None
             var = Manifold(nm).ptolemy_variety(2,'all')
             try:
                 if retrieve:
                     sols = var.retrieve_solutions()
                 else:
                     raise Exception('Coding too lazy!') 
-            except:
-                sols = var.compute_solutions(engine = engine)
-            data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
-            for d in data:
-                for v in d[1]:
-                    recs.setdefault(str(d[0]),list()).append((str(v),nm))
-            for k in recs.keys():   # remove duplicates
-                recs[k] = list(set(recs[k]))
+            except: # need to use engine
+                if engine:
+                    sols = var.compute_solutions(engine = engine)
+            if sols:
+                data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
+                for d in data:
+                    for v in d[1]:
+                        recs.setdefault(str(d[0]),list()).append((str(v),nm))
+                for k in recs.keys():   # remove duplicates
+                    recs[k] = list(set(recs[k]))
         except Exception as e:
             print(str(e))+'; skipping '+nm
             continue

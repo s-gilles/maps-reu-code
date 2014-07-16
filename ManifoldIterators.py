@@ -8,6 +8,16 @@ from itertools import permutations, combinations, product
 # Default maximum number of strands in a braid; high numbers of strands tend to make snappy take forever.
 DEF_STRANDS = 4
 
+# Given a list-like obj, returns the intersection of obj[blockidx*blocksz:(blockidx+1)*blocksz] and obj;
+# i.e. if blocksz is 100, you get obj[0:100],obj[100:200],obj[200,300]... for increasing blockidx
+def get_block(blockidx,blocksz,obj):
+    if blockidx*blocksz > len(obj):
+        return []
+    elif (blockidx+1)*blocksz > len(obj):
+        return obj[blockidx*blocksz:]
+    else:
+        return obj[blockidx*blocksz:(blockidx+1)*blocksz]
+
 # This iterator applies a given funct to source.next() before returning it.
 class ForwardingIterator:
     def __init__(self,source,funct):

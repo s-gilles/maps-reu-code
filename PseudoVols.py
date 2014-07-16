@@ -1,10 +1,39 @@
 #!/usr/bin/python
 
 from snappy import *
+from ManifoldIterators import *
+
+# The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
+# except output will be written out every period manifolds and logs generated, instead of all at once.
+def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', retrieve = True, period = 100, seperator = ';'):
+    ctr = 0
+    block = list()
+    done = False
+    try:
+        if append:
+            f = open(ofilenm,'a')
+        else:
+            f = open(ofilenm,'w')
+        while True:
+            try:
+                block.append(maniter.next())
+                ctr += 1
+            except StopIteration:
+                done = True
+            if ctr == period or done:
+                print 'Processing '+str(block[0])+' to '+str(block[-1])+'.' 
+                get_volume_data(ForwardingIterator(block.__iter__(),lambda m : str(m))).write_to_csv(f,append=append,seperator=seperator)
+                append = True  # we must be appending after the first time
+                ctr = 0
+                block = list()
+                if done:
+                    break
+    finally:
+        f.close()
 
 # Returns a VolumeData object containing exotic volumes for manifolds with the given names
 # Volumes' precision is based on pari, so set it there
-# set engine = None to skip computing the volumes
+# set engine = None to skip computing the volumes 
 def get_volume_data(man_nms, engine = 'magma', retrieve = True):
     recs = dict()
     for nm in man_nms:
@@ -16,9 +45,11 @@ def get_volume_data(man_nms, engine = 'magma', retrieve = True):
                     sols = var.retrieve_solutions()
                 else:
                     raise Exception('Coding too lazy!') 
-            except: # need to use engine
+            except Exception as e: # try using engine
                 if engine:
                     sols = var.compute_solutions(engine = engine)
+                else:
+                    print(str(e))+'; skipping '+nm
             if sols:
                 data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
                 for d in data:

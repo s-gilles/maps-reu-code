@@ -69,6 +69,13 @@ class dataset:
         del self.data[poly][0][root][vol]
         return rec
 
+    # These point to non-instance functions of the same name
+    def pare_all_volumes(self):
+        pare_all_volumes(self)
+
+    def cull_all_volumes(self):
+        cull_all_volumes(self)
+
     # Returns a dataset with the data from self and other; in case of a conflict, other's values beat self's or both are kept
     # Therefore, one is advised to use this on disjoint datasets or pare volumes afterwards
     def combine_with(self,other):

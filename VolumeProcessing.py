@@ -427,12 +427,12 @@ def pare_volume(data,poly,root,vol): # TODO: move these 4 methods into the class
         mpared.append(mdata.pop(1)[0])
 
 # Removes volumes that are integer multiples of another volume
-def cull_all_volumes(data):
+def cull_all_volumes(data, epsilon = EPSILON):
     for p in data.get_polys():
         for r in data.get_roots(p):
-            cull_volumes(data,p,r)
+            cull_volumes(data,p,r,epsilon = epsilon)
 
-def cull_volumes(data,poly,root):
+def cull_volumes(data,poly,root,epsilon = EPSILON):
     vols = data.get_volumes(poly,root)
     # vols = data.data[poly][0][root].keys()
     i = 0
@@ -440,14 +440,14 @@ def cull_volumes(data,poly,root):
         j = i + 1
         while j < len(vols):
             try:
-                if is_int(float(vols[i])/float(vols[j])) and gen.pari(vols[i] + ' > ' + vols[j]):
+                if is_int(float(vols[i])/float(vols[j]), epsilon = epsilon) and gen.pari(vols[i] + ' > ' + vols[j]):
                     # We have to throw away (culled) manifold names to let all culled manifolds have the same volume
                     # [j] divides [i] so remove [i]
                     data.remove_volume(poly,root,vols.pop(i))
                     # i is already effectivley incremented, so we must offset it
                     i = i-1
                     break
-                elif is_int(float(vols[j])/float(vols[i])):
+                elif is_int(float(vols[j])/float(vols[i]), epsilon = epsilon):
                     # this time, remove [j]
                     data.remove_volume(poly,root,vols.pop(j))
                     # j is effectivley incremented, no need to do it

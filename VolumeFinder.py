@@ -250,6 +250,12 @@ def compute_shape_fields(idx, temp_file_dir):
             _ready_manifolds.task_done()
             continue
 
+        # If non-geometric, spend a bit of time trying to make it geometric
+        randomize_attempts = 0
+        while manifold.solution_type(enum = True) == 2 and randomize_attempts < 16:
+            manifold.randomize()
+            randomize_attempts += 1
+
 
         manifold.save(full_fname)
         while True:

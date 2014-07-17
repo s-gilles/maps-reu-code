@@ -14,6 +14,7 @@ from itertools import combinations
 
 EPSILON = .0000000000001
 MAX_COEFF = 4096
+SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']   # globalize
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
@@ -172,36 +173,9 @@ class dataset:
         nms.extend(self.get_pared_manifolds(poly,root,vol))
         opt = ('', sys.float_info.max)
         for nm in nms:
-            if len(nm) < opt[1]:    # TODO: finish _niceness and replace len with it
+            if 0 < len(nm) < opt[1]:    # TODO: finish _niceness and replace len with it; why is 0 < required?
                 opt = (nm,len(nm))
         return opt[0]
-
-def _niceness(nm):
-    n = 0.0
-    k = nm[0]
-    if k == 'm':
-        n += 0
-    elif k == 'v':
-        n += 1
-    elif k == 't':
-        n += 2
-    elif k == 'o':
-        n += 3
-    elif k == 'K':  # TODO: apply knot and link # penalties
-        n += 4
-    elif k == 'L':
-        n += 5
-    elif k == 'b':
-        n += 6
-    elif k == 'B':
-        n += 7
-    elif k == 'D':
-        n += 8
-    else:
-        n += 10
-    # n *= gap TODO
-    # apply dehn penalties TODO
-    return n
 
     # If some volumes differ by less than epsilon, combine them, keeping one of them arbitrarily.
     # Slightly nondeterministic; may not get large, dense (compared to epsilon) clumps if iteration order is unfavorable.
@@ -239,7 +213,57 @@ def _niceness(nm):
                         nrec[1].extend(vol_data[v][1])
                         del vol_data[v]
                     vol_data[v] = nrec  # bit of an abuse of v
-                    
+
+    # Given a valid Manifold object or manifold name, returns whatever we have on it
+    # Form: [InvariantTraceField,Root,Volume,SolutionType,GeomAlternative,NiceAlternative] or None if it couldn't be found
+    # Form: [
+    def search_for_manifold(self,man):
+        man = str(man)
+        for p in self.get_polys():
+            for r in self.get_roots(p):
+                for v in self.get_volumes(p,r):
+                    if man in [rec[0] for rec in self.get_manifold_data(p,r,v)] or man in self.get_pared_manifolds(p,r,v):
+                        out = [p,r,v,None,None,None]
+                        if man in [rec[0] for rec in self.get_manifold_data(p,r,v)]: # search ourselves (save vs. randomize())
+                            for rec in self.get_manifold_data(p,r,v):
+                                if man in rec:
+                                    out[3] = rec[2]
+                        else:
+                            out[3] = SOL_TYPE_STRINGS[int(Manifold(man).solution_type(enum = True))]
+                        if out[3] == 'geometric':
+                            out[4] = man
+                        else:
+                            out[4] = self.get_geom_manifold(p,r,v)
+                        out[5] = self.get_nice_manifold_name(p,r,v)
+                        return out
+        return None
+
+def _niceness(nm):
+    n = 0.0
+    k = nm[0]
+    if k == 'm':
+        n += 0
+    elif k == 'v':
+        n += 1
+    elif k == 't':
+        n += 2
+    elif k == 'o':
+        n += 3
+    elif k == 'K':  # TODO: apply knot and link # penalties
+        n += 4
+    elif k == 'L':
+        n += 5
+    elif k == 'b':
+        n += 6
+    elif k == 'B':
+        n += 7
+    elif k == 'D':
+        n += 8
+    else:
+        n += 10
+    # n *= gap TODO
+    # apply dehn penalties TODO
+    return n                
 
 def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
     try:    
@@ -428,12 +452,12 @@ def pare_volume(data,poly,root,vol): # TODO: move these 4 methods into the class
         mpared.append(mdata.pop(1)[0])
 
 # Removes volumes that are integer multiples of another volume
-def cull_all_volumes(data):
+def cull_all_volumes(data, epsilon = EPSILON):
     for p in data.get_polys():
         for r in data.get_roots(p):
-            cull_volumes(data,p,r)
+            cull_volumes(data,p,r,epsilon = epsilon)
 
-def cull_volumes(data,poly,root):
+def cull_volumes(data,poly,root,epsilon = EPSILON):
     vols = data.get_volumes(poly,root)
     # vols = data.data[poly][0][root].keys()
     i = 0
@@ -441,14 +465,14 @@ def cull_volumes(data,poly,root):
         j = i + 1
         while j < len(vols):
             try:
-                if is_int(float(vols[i])/float(vols[j])) and gen.pari(vols[i] + ' > ' + vols[j]):
+                if is_int(float(vols[i])/float(vols[j]), epsilon = epsilon) and gen.pari(vols[i] + ' > ' + vols[j]):
                     # We have to throw away (culled) manifold names to let all culled manifolds have the same volume
                     # [j] divides [i] so remove [i]
                     data.remove_volume(poly,root,vols.pop(i))
                     # i is already effectivley incremented, so we must offset it
                     i = i-1
                     break
-                elif is_int(float(vols[j])/float(vols[i])):
+                elif is_int(float(vols[j])/float(vols[i]), epsilon = epsilon):
                     # this time, remove [j]
                     data.remove_volume(poly,root,vols.pop(j))
                     # j is effectivley incremented, no need to do it
@@ -536,6 +560,7 @@ def write_spans(fname, dataset, seperator = ';'):
 # poly : root : [[spanning_vols], fit_ratio, [spanning_names], [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
 # The latter form is used after deciding to fit some pseudovols (as a VolumeData) against a SpanData;
 # Doing so produces a VolumeData of those pseudovols we just couldn't fit, which can be written out as usual 
+# Also, this seems prone (for some reason) to causing stack overflows in PARI
 class SpanData:
 
     def __init__(self, data_dict, fails_dict = None):
@@ -645,9 +670,9 @@ class SpanData:
             if not self.fit_fails:
                 self.fit_fails = dict()
         for p in voldata.get_polys():
-            data = voldata.get_volume_data(p)
-            for rec in data:
-                _fit(p,rec)
+            for v in voldata.get_volumes(p):
+                for m in voldata.get_manifolds(p,v):
+                    _fit(p,(v,m))   # TODO fix this innefficent implementation (much redundnacy; should be once / v)
         for p in self.get_polys():      # got to recalc psuedo fit ratios
             for r in self.get_roots(p):
                 if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play

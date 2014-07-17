@@ -3,6 +3,7 @@
 from snappy import *
 from ManifoldIterators import *
 from VolumeProcessing import *
+from multiprocessing import *
 
 # Until this gets globalized
 EPSILON = .0000000000001    # same as VolumeProcessing
@@ -10,7 +11,7 @@ pari.set_real_precision(100)
 
 # The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
 # except output will be written out every period manifolds and logs generated, instead of all at once.
-def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', retrieve = True, period = 100, seperator = ';'):
+def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, seperator = ';'):
     ctr = 0
     block = list()
     done = False
@@ -27,7 +28,8 @@ def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', ret
                 done = True
             if ctr == period or done:
                 print 'Processing '+str(block[0])+' to '+str(block[-1])+'.' 
-                get_volume_data(ForwardingIterator(block.__iter__(),lambda m : str(m))).write_to_csv(f,append=append,seperator=seperator)
+                v = get_volume_data(ForwardingIterator(block.__iter__(),lambda m : str(m)),engine=engine,max_secs=max_secs,retrieve=retrieve)
+                v.write_to_csv(f,append=append,seperator=seperator)
                 append = True  # we must be appending after the first time
                 ctr = 0
                 block = list()
@@ -38,8 +40,14 @@ def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', ret
 
 # Returns a VolumeData object containing exotic volumes for manifolds with the given names
 # Volumes' precision is based on pari, so set it there
-# set engine = None to skip computing the volumes 
-def get_volume_data(man_nms, engine = 'magma', retrieve = True):
+# set retrieve = False to skip retrieving ptolemy data from files
+# set engine = None to skip computing ptolemy data in an engine
+# set max_secs to specify how long we will spend computing a given manifolds' data before killing the engine and moving on;
+#   specifying None means we will never give up (unless something crashes)
+def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
+    if engine:
+        def _use_engine(v,p):   # this function will be called in a second process to facilitate time limits
+            p.send(v.compute_solutions(engine = engine))
     recs = dict()
     for nm in man_nms:
         try:
@@ -52,9 +60,18 @@ def get_volume_data(man_nms, engine = 'magma', retrieve = True):
                     raise Exception('Coding too lazy!') 
             except Exception as e: # try using engine
                 if engine:
-                    sols = var.compute_solutions(engine = engine)
+                    mine, theirs = Pipe(duplex = False)
+                    p = Process(target=_use_engine,args=[var,theirs])
+                    p.start()
+                    if mine.poll(max_secs): # Here is the time limit stuff
+                        sols = mine.recv()
+                    else:
+                        p.terminate()   # give up on this one
+                        print 'Computation took too long; skipping '+nm
+                        continue
                 else:
-                    print(str(e))+'; skipping '+nm
+                    print 'No engine and no data retrieved; skipping '+nm
+                    continue
             if sols:
                 data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
                 for d in data:
@@ -62,6 +79,8 @@ def get_volume_data(man_nms, engine = 'magma', retrieve = True):
                         recs.setdefault(str(d[0]),list()).append((str(v),nm))
                 for k in recs.keys():   # remove duplicates
                     recs[k] = list(set(recs[k]))
+            else:
+                print 'Got no solutions; skipping '+nm
         except Exception as e:
             print(str(e))+'; skipping '+nm
             continue

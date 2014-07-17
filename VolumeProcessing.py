@@ -14,6 +14,7 @@ from itertools import combinations
 
 EPSILON = .0000000000001
 MAX_COEFF = 4096
+SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']   # globalize
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
@@ -172,7 +173,7 @@ class dataset:
         nms.extend(self.get_pared_manifolds(poly,root,vol))
         opt = ('', sys.float_info.max)
         for nm in nms:
-            if len(nm) < opt[1]:    # TODO: finish _niceness and replace len with it
+            if 0 < len(nm) < opt[1]:    # TODO: finish _niceness and replace len with it; why is 0 < required?
                 opt = (nm,len(nm))
         return opt[0]
 
@@ -212,6 +213,30 @@ class dataset:
                         nrec[1].extend(vol_data[v][1])
                         del vol_data[v]
                     vol_data[v] = nrec  # bit of an abuse of v
+
+    # Given a valid Manifold object or manifold name, returns whatever we have on it
+    # Form: [InvariantTraceField,Root,Volume,SolutionType,GeomAlternative,NiceAlternative] or None if it couldn't be found
+    # Form: [
+    def search_for_manifold(self,man):
+        man = str(man)
+        for p in self.get_polys():
+            for r in self.get_roots(p):
+                for v in self.get_volumes(p,r):
+                    if man in [rec[0] for rec in self.get_manifold_data(p,r,v)] or man in self.get_pared_manifolds(p,r,v):
+                        out = [p,r,v,None,None,None]
+                        if man in [rec[0] for rec in self.get_manifold_data(p,r,v)]: # search ourselves (save vs. randomize())
+                            for rec in self.get_manifold_data(p,r,v):
+                                if man in rec:
+                                    out[3] = rec[2]
+                        else:
+                            out[3] = SOL_TYPE_STRINGS[int(Manifold(man).solution_type(enum = True))]
+                        if out[3] == 'geometric':
+                            out[4] = man
+                        else:
+                            out[4] = self.get_geom_manifold(p,r,v)
+                        out[5] = self.get_nice_manifold_name(p,r,v)
+                        return out
+        return None
 
 def _niceness(nm):
     n = 0.0

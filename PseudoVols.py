@@ -44,6 +44,7 @@ def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max
 # set engine = None to skip computing ptolemy data in an engine
 # set max_secs to specify how long we will spend computing a given manifolds' data before killing the engine and moving on;
 #   specifying None means we will never give up (unless something crashes)
+# if the engine given crashes, so will IDLE and SnapPy; to avoid this, run this command only from within python scripts.
 def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
     if engine:
         def _use_engine(v,p):   # this function will be called in a second process to facilitate time limits

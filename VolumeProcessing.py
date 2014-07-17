@@ -49,10 +49,10 @@ class dataset:
 
     # returns a geometric manifold's record, or None failing that
     def get_geom_manifold(self,poly,root,vol):
-        try:
-            return self.data[poly][0][root][vol][0][0]
-        except:
-            return (None,None,None)
+        for rec in self.get_manifold_data(poly,root,vol):
+            if rec[2] == 'geometric':
+                return rec
+        return (None,None,None)
 
     # Returns triplets of a manifold's name, number of simplices, and solution type
     def get_manifold_data(self,poly,root,vol):
@@ -624,8 +624,8 @@ class SpanData:
                 tf = tf.replace(' ','')
                 if tf in self.get_polys():
                     for r in self.get_roots(tf):
-                        if 'Error' in self.data[tf][r]: # can't handle the format (TODO?)
-                            continue                    # so we skip this one
+                        if 'Error' in self.data[tf][r]: # can't handle the format (TODO?)   # DEBUG
+                            continue                    # so we skip this one               # DEBUG
                         ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff)
                         if ldp and ldp[-1] != 0:
                             if abs(ldp[-1]) == 1:    # the match was perfect, update the data

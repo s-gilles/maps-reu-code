@@ -176,33 +176,6 @@ class dataset:
                 opt = (nm,len(nm))
         return opt[0]
 
-def _niceness(nm):
-    n = 0.0
-    k = nm[0]
-    if k == 'm':
-        n += 0
-    elif k == 'v':
-        n += 1
-    elif k == 't':
-        n += 2
-    elif k == 'o':
-        n += 3
-    elif k == 'K':  # TODO: apply knot and link # penalties
-        n += 4
-    elif k == 'L':
-        n += 5
-    elif k == 'b':
-        n += 6
-    elif k == 'B':
-        n += 7
-    elif k == 'D':
-        n += 8
-    else:
-        n += 10
-    # n *= gap TODO
-    # apply dehn penalties TODO
-    return n
-
     # If some volumes differ by less than epsilon, combine them, keeping one of them arbitrarily.
     # Slightly nondeterministic; may not get large, dense (compared to epsilon) clumps if iteration order is unfavorable.
     # But that is very unlikely to happen,
@@ -239,7 +212,33 @@ def _niceness(nm):
                         nrec[1].extend(vol_data[v][1])
                         del vol_data[v]
                     vol_data[v] = nrec  # bit of an abuse of v
-                    
+
+def _niceness(nm):
+    n = 0.0
+    k = nm[0]
+    if k == 'm':
+        n += 0
+    elif k == 'v':
+        n += 1
+    elif k == 't':
+        n += 2
+    elif k == 'o':
+        n += 3
+    elif k == 'K':  # TODO: apply knot and link # penalties
+        n += 4
+    elif k == 'L':
+        n += 5
+    elif k == 'b':
+        n += 6
+    elif k == 'B':
+        n += 7
+    elif k == 'D':
+        n += 8
+    else:
+        n += 10
+    # n *= gap TODO
+    # apply dehn penalties TODO
+    return n                
 
 def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
     try:    

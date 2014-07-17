@@ -536,6 +536,7 @@ def write_spans(fname, dataset, seperator = ';'):
 # poly : root : [[spanning_vols], fit_ratio, [spanning_names], [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
 # The latter form is used after deciding to fit some pseudovols (as a VolumeData) against a SpanData;
 # Doing so produces a VolumeData of those pseudovols we just couldn't fit, which can be written out as usual 
+# Also, this seems prone (for some reason) to causing stack overflows in PARI
 class SpanData:
 
     def __init__(self, data_dict, fails_dict = None):
@@ -645,9 +646,9 @@ class SpanData:
             if not self.fit_fails:
                 self.fit_fails = dict()
         for p in voldata.get_polys():
-            data = voldata.get_volume_data(p)
-            for rec in data:
-                _fit(p,rec)
+            for v in voldata.get_volumes(p):
+                for m in voldata.get_manifolds(p,v):
+                    _fit(p,(v,m))   # TODO fix this innefficent implementation (much redundnacy; should be once / v)
         for p in self.get_polys():      # got to recalc psuedo fit ratios
             for r in self.get_roots(p):
                 if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play

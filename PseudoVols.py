@@ -81,7 +81,7 @@ def _binmiss(s,l):
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
 
-    # structure: dict poly ---> list of (volume, manifold, ?fitted)
+    # structure: dict poly ---> dict volume ---> [manifolds]
     def __init__(self, data = dict()):
         self.data = data
 
@@ -89,13 +89,10 @@ class VolumeData:
         return self.data.keys()
 
     def get_volumes(self,poly):
-        return [rec[0] for rec in self.data[poly]]
+        return self.data[poly].keys()
 
-    def get_manifolds(self,poly):
-        return [rec[1] for rec in self.data[poly]]
-
-    def get_volume_data(self,poly):
-        return self.data[poly]
+    def get_manifolds(self,poly,volume):
+        return self.data[poly][volume]
 
     # returns a VolumeData object containing the data from this and other; in case of a conflict, other's data takes precendence
     def combine_with(self,other):
@@ -118,14 +115,26 @@ class VolumeData:
             if not append:
                 f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+'\n')
             for p in self.get_polys():
-                for rec in self.get_volume_data(p):
-                    f.write('"'+p+'"'+seperator)
-                    f.write('"'+rec[0]+'"'+seperator)
-                    f.write('"'+rec[1]+'"\n')
+                for v in self.get_volumes(p):
+                    for m in self.get_manifolds(p,v):
+                        f.write('"'+p+'"'+seperator)
+                        f.write('"'+v+'"'+seperator)
+                        f.write('"'+m+'"\n')
         finally:
             if type(output_file) == str and f:
                 f.close()
 
+    # This filter removes some polynomials with no subfields of degree <= maxsfdegree
+    # it doesn't get them all, but does avoid calling nfsubfields; it is quick and approximate.
+    def filter_fields(self, maxsfdegree):
+        def _filter(p): # for a double break
+            deg = pari(p).poldegree()
+            for n in xrange(maxsfdegree):
+                if _binmiss(n+1,deg):
+                    return
+            del self.data[p]
+        for p in self.data.keys():
+            _filter(p)
 
     # given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it
 def read_volumedata_csv(infile, seperator = ';'):
@@ -138,7 +147,11 @@ def read_volumedata_csv(infile, seperator = ';'):
         data = dict()
         for l in f.readlines():
             w = l.strip('\n').replace('"','').split(seperator)
-            data.setdefault(w[0],list()).append(w[1:])
+            try:
+                data.setdefault(w[0],dict()).setdefault(w[1],list()).append(w[2])
+            except IndexError:  # This was initially for debugging, but it can be useful if you grabbed a file while a line was being written 
+                print 'Malformed Input: '+str(w)
+                continue
         return VolumeData(data = data)
     finally:
         if type(infile) == str and f:

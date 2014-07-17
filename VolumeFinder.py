@@ -303,7 +303,7 @@ def compute_shape_fields(idx, temp_file_dir):
                     vol = str(manifold.high_precision().volume())
                 except:
                     print(str(manifold) + ' crashed pari while determining volume in ' + str(idx) + '!')
-                    vol = str(manifold.volume())
+                    break
                 polynomial = trace_match.group(1).strip()
                 dm = re.match('x\^([0-9]+).*', polynomial)
                 degree = 0

@@ -2,8 +2,10 @@
 
 from snappy import *
 from ManifoldIterators import *
+from VolumeProcessing import *
 
 # Until this gets globalized
+EPSILON = .0000000000001    # same as VolumeProcessing
 pari.set_real_precision(100)
 
 # The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
@@ -136,7 +138,59 @@ class VolumeData:
         for p in self.data.keys():
             _filter(p)
 
-    # given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it
+    # Remove all volumes that are integral multiples of another volume (including 1*)
+    # To register as an integral multiple, the decimal part of big/small must be less than epsilon
+    # Will remove manifolds if all their pvols were integral multiples of other pvols
+    def cull_volumes(self, epsilon = EPSILON):  # code adapted from VolumeProcessing
+        for poly in self.get_polys():        
+            vols = self.get_volumes(poly)
+            i = 0
+            while i < len(vols) - 1:
+                j = i + 1
+                while j < len(vols):
+                    try:
+                        if is_int(float(vols[i])/float(vols[j]), epsilon = epsilon) and gen.pari(vols[i] + ' > ' + vols[j]):
+                            # We have to throw away (culled) manifold names to let all culled manifolds have the same volume
+                            # [j] divides [i] so remove [i]
+                            del self.data[poly][vols.pop(i)]
+                            # i is already effectivley incremented, so we must offset it
+                            i = i-1
+                            break
+                        elif is_int(float(vols[j])/float(vols[i]), epsilon = epsilon):
+                            # this time, remove [j]
+                            del self.data[poly][vols.pop(i)]
+                            # j is effectivley incremented, no need to do it
+                        else:
+                            j += 1
+                    except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
+                        j += 1
+                i += 1
+
+    # Removes any volume less than epsilon
+    def remove_zeros(self, epsilon = EPSILON):
+        for p in self.get_polys():
+            for v in self.get_volumes(p):
+                try:
+                    if float(v) < epsilon:
+                        del self.data[p][v]
+                except ValueError:  # v was really close to 0
+                    del self.data[p][v]
+
+    # Runs several methods for decreasing size without losing much information
+    # Will remove manifolds if all their pvols were integral multiples of other pvols
+    def clean(self, maxsfdegree, epsilon = EPSILON):
+        self.filter_fields(maxsfdegree)
+        self.remove_zeros(epsilon = epsilon)
+        self.cull_volumes(epsilon = epsilon)
+
+    # Cut down to 1 manifold per poly,vol pair.
+    def remove_duplicate_manifolds(self):
+        for p in self.get_polys():
+            for v in self.get_volumes(p):
+                self.data[p][v] = [self.data[p][v][0]]
+
+
+# given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it
 def read_volumedata_csv(infile, seperator = ';'):
     try:
         if type(infile) ==  str:

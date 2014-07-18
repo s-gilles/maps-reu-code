@@ -63,9 +63,11 @@ def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
                 if engine:
                     mine, theirs = Pipe(duplex = False)
                     p = Process(target=_use_engine,args=[var,theirs])
+                    p.daemon = True
                     p.start()
                     if mine.poll(max_secs): # Here is the time limit stuff
                         sols = mine.recv()
+                        p.terminate()
                     else:
                         p.terminate()   # give up on this one
                         print 'Computation took too long; skipping '+nm

@@ -452,7 +452,7 @@ def pare_all_volumes(data):
             for v in data.get_volumes(p,r):
                 pare_volume(data,p,r,v)
 
-def pare_volume(data,poly,root,vol): # TODO: move these 4 methods into the class
+def pare_volume(data,poly,root,vol): # move these 4 methods into the class
     mdata = data.get_manifold_data(poly,root,vol)
     mpared = data.get_pared_manifolds(poly,root,vol)
     while len(mdata) > 1:
@@ -656,8 +656,9 @@ class SpanData:
                 tf = tf.replace(' ','')
                 if tf in self.get_polys():
                     for r in self.get_roots(tf):
-                        if 'Error' in self.data[tf][r]: # can't handle the format (TODO?)   # DEBUG
-                            continue                    # so we skip this one               # DEBUG
+                        if 'Error' in self.data[tf][r]:
+                            print 'Couldn\'t handle '+str(self.data[tf][r]) # can't handle the format
+                            continue                                        # so we skip this one
                         ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff)
                         if ldp and ldp[-1] != 0:
                             if abs(ldp[-1]) == 1:    # the match was perfect, update the data
@@ -683,7 +684,7 @@ class SpanData:
         for p in self.get_polys():      # got to recalc psuedo fit ratios
             for r in self.get_roots(p):
                 if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play
-                    if self.data[p][r][5]:  # take gcd using basis vectors and pseudo vols; hopefully equivalent by linear algebra TODO: verify
+                    if self.data[p][r][5]:  # TODO: make this record if coeff > fit ratio
                         dim = len(self.data[p][r][0])
                         vecs = list()                    
                         for n in xrange(dim):   # put in basis unit vectors
@@ -733,7 +734,7 @@ def get_data_object(dset):
 def _pari_lindep(str_vols, maxcoeff = MAX_COEFF):
     vols = list(str_vols)   # in case someone sent some other type collection
     vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
-    if not vec or vec == ['']: # no input; TODO implement more elegantly
+    if not vec or vec == ['']: # no input
         return list()
     o = [int(v) for v in vec]
     if maxcoeff > 0:

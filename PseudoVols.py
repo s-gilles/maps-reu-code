@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
-from snappy import *
+from snappy import Manifold
+from cypari import *
 from ManifoldIterators import *
 from VolumeProcessing import *
 from multiprocessing import *
@@ -45,6 +46,7 @@ def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max
 # set max_secs to specify how long we will spend computing a given manifolds' data before killing the engine and moving on;
 #   specifying None means we will never give up (unless something crashes)
 # if the engine given crashes, so will IDLE and SnapPy; to avoid this, run this command only from within python scripts.
+# TODO: special case max_secs=None to not bother with processes
 def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
     if engine:
         def _use_engine(v,p):   # this function will be called in a second process to facilitate time limits
@@ -79,14 +81,15 @@ def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
                 data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
                 for d in data:
                     for v in d[1]:
-                        recs.setdefault(str(d[0]),list()).append((str(v),nm))
-                for k in recs.keys():   # remove duplicates
-                    recs[k] = list(set(recs[k]))
+                        recs.setdefault(str(d[0]),dict()).setdefault(str(v),list()).append(nm)
             else:
                 print 'Got no solutions; skipping '+nm
         except Exception as e:
             print(str(e))+'; skipping '+nm
             continue
+    for p in recs.keys():
+        for v in recs[p].keys():
+            recs[p][v] = list(set(recs[p][v]))
     return VolumeData(data = recs)
 
 def get_potential_trace_fields(poly):
@@ -171,7 +174,7 @@ class VolumeData:
                 j = i + 1
                 while j < len(vols):
                     try:
-                        if is_int(float(vols[i])/float(vols[j]), epsilon = epsilon) and gen.pari(vols[i] + ' > ' + vols[j]):
+                        if is_int(float(vols[i])/float(vols[j]), epsilon = epsilon) and gen.pari(vols[i] + ' > ' + vols[j]) == 1:
                             # We have to throw away (culled) manifold names to let all culled manifolds have the same volume
                             # [j] divides [i] so remove [i]
                             del self.data[poly][vols.pop(i)]
@@ -211,6 +214,8 @@ class VolumeData:
             for v in self.get_volumes(p):
                 self.data[p][v] = [self.data[p][v][0]]
 
+def is_int(fl, epsilon = EPSILON):
+    return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
 # given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it
 def read_volumedata_csv(infile, seperator = ';'):

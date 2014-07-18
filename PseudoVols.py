@@ -82,13 +82,14 @@ def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
                 for d in data:
                     for v in d[1]:
                         recs.setdefault(str(d[0]),dict()).setdefault(str(v),list()).append(nm)
-                for k in recs.keys():   # remove duplicates
-                    recs[k] = list(set(recs[k]))
             else:
                 print 'Got no solutions; skipping '+nm
         except Exception as e:
             print(str(e))+'; skipping '+nm
             continue
+    for p in recs.keys():
+        for v in recs[p].keys():
+            recs[p][v] = list(set(recs[p][v]))
     return VolumeData(data = recs)
 
 def get_potential_trace_fields(poly):

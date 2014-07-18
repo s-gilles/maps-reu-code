@@ -14,7 +14,7 @@ pari.set_real_precision(100)
 # except output will be written out every period manifolds and logs generated, instead of all at once.
 def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, seperator = ';'):
     ctr = 0
-    block = list()l
+    block = list()
     done = False
     try:
         if append:

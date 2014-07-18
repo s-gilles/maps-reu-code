@@ -731,10 +731,24 @@ def get_data_object(dset):
 # Accepts volumes as strings since we store them that way.
 # Returns the dependancy found (if any) as a list of integers if all coefficents are <= maxcoeff or maxcoeff is nonpositive;
 # otherwise, it returns []
-def _pari_lindep(str_vols, maxcoeff = MAX_COEFF):
+def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
     vols = list(str_vols)   # in case someone sent some other type collection
-    vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
+    vec = None
+
+    num_tries = 0
+    while num_tries < max_tries:
+        try:
+            vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
+            break
+        except:
+            pass
+        num_tries += 1
+
     if not vec or vec == ['']: # no input
+        #######
+        print('Sometimes went wrong calculating ' + str(str_vols))
+        #######
+
         return list()
     o = [int(v) for v in vec]
     if maxcoeff > 0:

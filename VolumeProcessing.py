@@ -326,26 +326,20 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
 def read_raw_csv_from_file(in_file, seperator = ';'):
     return read_raw_csv(in_file.readlines(), seperator)
 
-def ip(z):
-    return re.match(r'[+-]\d+\*I',z).group()
-    
-def rp(z):
-    s = re.match(r'-?\d+(*I)?',z).group()
-    if 'I' not in s:    # didn't get ip when rp = 0
-        return s
-    return None
-
-
 # Returns true if the given strings are equal or complex conjugates as formatted by snap: a+b*I, a-b*I
-def up_to_conjugates(z,w):
+def _up_to_conjugates(z,w):
     zp = re.findall(r'([+-]?[\d.]+)',z)
     wp = re.findall(r'([+-]?[\d.]+)',w)
-    return len(zp) == len(wp) == 2 and zp[0] == wp[0] and up_to_sign(zp[1],wp[1])
+    return len(zp) == len(wp) == 2 and zp[0] == wp[0] and _up_to_sign(zp[1],wp[1])
 
 # Returns true if one of the strings is just -the other
 # Should only be applied to non sci-notation floats' strings
-def up_to_sign(x,y):
+def _up_to_sign(x,y):
     return re.search(r'[\d.]+',x).group() == re.search(r'[\d.]+',y).group()
+
+# Given a+b*I, returns a\pm b*I
+def _get_conjs(z):
+    return z[:1]+z[1:].replace('+','\xb1').replace('-','\xb1')
 
 def read_raw_csv(contents, seperator = ';'):
     data = dict()
@@ -374,7 +368,7 @@ def read_raw_csv(contents, seperator = ';'):
         # w[8]: polynomial discriminant -----------------> data[poly][3]
         # w[9]: polynomial discriminant (factorized) ----> data[poly][4]
         # vr = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[2],[list(),list(),w[5]])[0].append(w[0:2]) # OLD
-        # # why was vr set just now and not used?
+        # # why was vr set just now and not used? 
         vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
 
         vol_entry[0].append((w[0],w[1],w[6]))
@@ -522,13 +516,17 @@ def _span_guesses(data):
         if ncp < 1:
             continue
         try:
-            for root in data.get_roots(poly):
-                vols = [(gen.pari(v),data.get_geom_manifold(poly,root,v)[0]) for v in data.get_volumes(poly, root)]
+            roots = set([_get_conjs(r) for r in data.get_roots(poly)])  # turn roots into equivalence classes of conjugation
+            for root in roots:
+                vols = list()
+                for other in data.get_roots(poly):
+                    if _up_to_conjugates(root,other):
+                        vols.extend([(gen.pari(v),data.get_geom_manifold(poly,other,v)[0]) for v in data.get_volumes(poly,other)])
                 vols = [v for v in vols if gen.pari(str(v[0]) + ' > 0.9') ]
                 if not vols:
                     continue
                 try:
-                    poly_dict[root] = find_span(vols, ncp)
+                    poly_dict[root] = find_span(vols, ncp)  # HERE
                 except ValueError as ve:
                     poly_dict[root] = ("Error (" + str(ve) + ")", 0, "Error")
         except Exception as e:

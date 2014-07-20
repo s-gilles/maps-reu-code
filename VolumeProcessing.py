@@ -326,6 +326,27 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
 def read_raw_csv_from_file(in_file, seperator = ';'):
     return read_raw_csv(in_file.readlines(), seperator)
 
+def ip(z):
+    return re.match(r'[+-]\d+\*I',z).group()
+    
+def rp(z):
+    s = re.match(r'-?\d+(*I)?',z).group()
+    if 'I' not in s:    # didn't get ip when rp = 0
+        return s
+    return None
+
+
+# Returns true if the given strings are equal or complex conjugates as formatted by snap: a+b*I, a-b*I
+def up_to_conjugates(z,w):
+    zp = re.findall(r'([+-]?[\d.]+)',z)
+    wp = re.findall(r'([+-]?[\d.]+)',w)
+    return len(zp) == len(wp) == 2 and zp[0] == wp[0] and up_to_sign(zp[1],wp[1])
+
+# Returns true if one of the strings is just -the other
+# Should only be applied to non sci-notation floats' strings
+def up_to_sign(x,y):
+    return re.search(r'[\d.]+',x).group() == re.search(r'[\d.]+',y).group()
+
 def read_raw_csv(contents, seperator = ';'):
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
@@ -572,6 +593,7 @@ class SpanData:
 
     def __init__(self, data_dict, fails_dict = None):
         self.data = data_dict
+        self.nice_fits = dict()
         if data_dict:
             p = data_dict.keys().__iter__().next()
             r = data_dict[p].keys().__iter__().next()  # this really shouldn't fail
@@ -601,6 +623,11 @@ class SpanData:
 
     def get_pseudo_data(self, poly, root):
         return self.data[poly][root][3:]
+
+    # If fitted, gives a dict manifold --> itf --> root --> volume --> lindep
+    # where lindep is the result of lindepping get_spans(ift,root) + [volume]
+    def get_nice_fits(self):
+        return self.nice_fits
 
     # Given a valid filename or open, write-ready file object, writes our data out to it.
     def write_to_csv(self, outfile, dset, seperator = ';', append = False):
@@ -646,7 +673,7 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-    def fit(self, voldata, maxcoeff = MAX_COEFF):
+    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = 4):
         def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
             if len(self.data[p][r]) == 3:
                 self.data[p][r].extend([list(),0,list()])
@@ -659,18 +686,20 @@ class SpanData:
                         if 'Error' in self.data[tf][r]:
                             print 'Couldn\'t handle '+str(self.data[tf][r]) # can't handle the format
                             continue                                        # so we skip this one
-                        ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff)
+                        ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff, max_tries = max_ldp_tries)
                         if ldp and ldp[-1] != 0:
                             if abs(ldp[-1]) == 1:    # the match was perfect, update the data
                                 _fresz(tf,r)
                                 self.data[tf][r][3].append(rec)
+                                self.nice_fits.setdefault(rec[1],dict()).setdefault(tf,dict()).setdefault(r,dict())[rec[0]] = ldp
                                 return
                             else:   # the match was imperfect, maybe a better fit awaits
-                                if not cand or cand[1] > ldp[-1]:   # better than previous best fit
-                                    cand = ((tf,r),ldp[-1])
+                                if not cand or cand[1][-1] > ldp[-1]:   # better than previous best fit
+                                    cand = ((tf,r),ldp) # we store the whole lindep for later
             if cand:    # have a rational but not integral fit
                 _fresz(cand[0][0],cand[0][1])
                 self.data[cand[0][0]][cand[0][1]][5].append(rec)
+                self.nice_fits.setdefault(rec[1],dict()).setdefault(cand[0][0],dict()).setdefault(cand[0][1],dict())[rec[0]] = cand[1]
             else:       # no rational fit, store the failure
                 self.fit_fails.setdefault(p,list()).append(rec)
         if not self.fitted:
@@ -715,11 +744,47 @@ class SpanData:
         try:
             if not append:
                 f.write('TraceField' + seperator + 'Volume' + seperator + 'Manifold\n')
-            for p in self.fit_fails:
+            for p in self.fit_fails.keys(): # was this working without keys?
                 for rec in self.fit_fails[p]:
                     f.write('"'+str(p)+'"'+seperator)
                     f.write('"'+str(rec[0])+'"'+seperator)
                     f.write('"'+str(rec[1])+'"\n')
+        finally:
+            if type(outfile) == str:
+                f.close()
+
+    # Writes out the linear combinations producing exotic volumes in a relatively readable format as described below
+    # The format for the combination is:
+    # k*exotic_man=k*man_1+-k*man_2+-k*man_3...
+    # where k are some nonzero integers (so no if one is negative), +- is + or -, exotic_man is Manifold, 
+    # and the other manifolds names stand in for their geometric volumes
+    def write_nice_fits(self, outfile, seperator = ';', append = False):
+        if type(outfile) == str:
+            if append:
+                f = open(outfile,'a')
+            else:
+                f = open(outfile,'w')
+        else:
+            f = outfile
+        try:
+            if not append:
+                f.write('Manifold'+seperator+'InvTraceField'+seperator+'Root'+seperator+'Volume'+seperator+'Combination\n')
+            for m in self.nice_fits.keys():
+                for itf in self.nice_fits[m].keys():
+                    for r in self.nice_fits[m][itf].keys():
+                        for v in self.nice_fits[m][itf][r].keys():
+                            ldp = self.nice_fits[m][itf][r][v]
+                            comb = str(ldp[-1])+'*'+m+'='
+                            for n in xrange(len(ldp)-1):
+                                if n != 0 and -1*ldp[n] > 0:  # don't add a plus sign for the first term
+                                    comb += '+'
+                                if ldp[n] != 0:
+                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[2][n]
+                            f.write('"'+m+'"'+seperator)
+                            f.write('"'+itf+'"'+seperator)
+                            f.write('"'+r+'"'+seperator)
+                            f.write('"'+v+'"'+seperator)
+                            f.write('"'+comb+'"\n')
         finally:
             if type(outfile) == str:
                 f.close()
@@ -741,6 +806,7 @@ def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
             vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
             break
         except:
+            print 'Stack overflow, retrying...'
             pass
         num_tries += 1
 
@@ -753,7 +819,7 @@ def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
     o = [int(v) for v in vec]
     if maxcoeff > 0:
         for x in o:
-            if x > maxcoeff:
+            if abs(x) > maxcoeff:
                 o = list()
                 break
     return o

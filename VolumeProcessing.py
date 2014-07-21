@@ -526,7 +526,7 @@ def _span_guesses(data):
                 vols = list()
                 for other in data.get_roots(poly):
                     if _up_to_conjugates(root,other):
-                        vols.extend([(gen.pari(v),data.get_nice_manifold_name(poly,other,v)) for v in data.get_volumes(poly,other)])
+                        vols.extend([(v,data.get_nice_manifold_name(poly,other,v)) for v in data.get_volumes(poly,other)])
                 vols = [v for v in vols if gen.pari(str(v[0]) + ' > 0.9') ]
                 if not vols:
                     continue

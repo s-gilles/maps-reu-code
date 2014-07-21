@@ -553,8 +553,6 @@ def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
         fi.close()
     d = read_raw_csv(lines)
     d.remove_non_geometric_elements()
-    pare_all_volumes(d)
-    cull_all_volumes(d)
     write_spans(out_filename, d, seperator = out_seperator)
     
 

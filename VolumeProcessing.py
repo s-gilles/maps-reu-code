@@ -16,6 +16,7 @@ EPSILON = .0000000000001
 MAX_COEFF = 4096
 MAX_ITF = 8
 SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']   # globalize
+pari.set_real_precision(100)
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.

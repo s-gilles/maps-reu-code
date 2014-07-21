@@ -4,6 +4,7 @@ from cypari import *
 import itertools
 
 _EPSILON = 1e-12
+pari.set_real_precision(100)
 
 def find_span(elts, n, cutoff = 4096):
     """Where elts is a list [a1, a2, a3, ... ], and each ai is a (pari object, name) returns (s, sn, r), where s is determined to be the optimal span that is a subset of elts for an n-dimensional lattice, sn is the corresponding names for s, and r is the ratio of det(S) / d, with S the matrix formed out of s, and d the gcd of all possible such determinants.  It follows that s is a basis for elts iff r is 1.

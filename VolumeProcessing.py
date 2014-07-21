@@ -25,6 +25,9 @@ class dataset:
     def __init__(self, data_dict = dict()):
         self.data = data_dict
 
+    def copy(self):
+        return dataset(self.data.copy())
+
     def get_polys(self):
         return self.data.keys()
 
@@ -193,10 +196,11 @@ class dataset:
     # Only usefull if you don't want to cull;
     # Only briefly tested
     def smush_volumes(self, epsilon = EPSILON):
+        d = self.copy()
         balls = list()        
-        for p in self.get_polys():
-            for r in self.get_roots(p):
-                vol_data = self.data[p][0][r]
+        for p in d.get_polys():
+            for r in d.get_roots(p):
+                vol_data = d.data[p][0][r]
                 balls = list()
                 vols = list(vol_data.keys())
                 for v in vols:  # find close volumes
@@ -222,6 +226,7 @@ class dataset:
                         nrec[1].extend(vol_data[v][1])
                         del vol_data[v]
                     vol_data[v] = nrec  # bit of an abuse of v
+        return d
 
     # Given a valid Manifold object or manifold name, returns whatever we have on it
     # Form: [InvariantTraceField,Root,Volume,SolutionType,GeomAlternative,NiceAlternative] or None if it couldn't be found
@@ -281,7 +286,8 @@ def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
         f.close()
         return d
     except:
-        f.close()
+        if f:
+            f.close()
         raise
         
 

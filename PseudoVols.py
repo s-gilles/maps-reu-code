@@ -3,7 +3,6 @@
 from snappy import Manifold
 from cypari import *
 from ManifoldIterators import *
-from VolumeProcessing import *
 from multiprocessing import *
 
 # Until this gets globalized

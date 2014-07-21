@@ -353,7 +353,11 @@ def read_raw_csv(contents, seperator = ';'):
             w = l.replace('\n','').replace('"','').split(seperator)
 
         # Since order got changed (for some unknown reason):
-        w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
+        try:
+            w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
+        except:
+            print('Error with line ' + str(l))
+            continue
         # Incase the disc was 1, a temporary hack:
         # if len(w) == 8:
         #   w.append('')
@@ -521,7 +525,7 @@ def _span_guesses(data):
                 vols = list()
                 for other in data.get_roots(poly):
                     if _up_to_conjugates(root,other):
-                        vols.extend([(gen.pari(v),data.get_geom_manifold(poly,other,v)[0]) for v in data.get_volumes(poly,other)])
+                        vols.extend([(gen.pari(v),data.get_nice_manifold_name(poly,other,v)) for v in data.get_volumes(poly,other)])
                 vols = [v for v in vols if gen.pari(str(v[0]) + ' > 0.9') ]
                 if not vols:
                     continue
@@ -549,8 +553,6 @@ def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
         fi.close()
     d = read_raw_csv(lines)
     d.remove_non_geometric_elements()
-    pare_all_volumes(d)
-    cull_all_volumes(d)
     write_spans(out_filename, d, seperator = out_seperator)
     
 

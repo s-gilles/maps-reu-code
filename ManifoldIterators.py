@@ -526,7 +526,7 @@ def pqs_in_range(dehn_pq_limit, num_cusps):
     return product(*pqs_mult)
 
 class DehnFillIterator:
-    def __init__(self, source, full_dehn_pq_limit = [6, 16, 12, 8, 6, 4, 3], fast_forward_to_pq = None):
+    def __init__(self, source, full_dehn_pq_limit = [6, 16, 12, 8, 6, 4, 3, 3, 2, 2, 2], fast_forward_to_pq = None):
         self.mnum = 0
         self.pulling_from = source
         self.current_manifold = self.pulling_from.next()

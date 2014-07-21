@@ -7,13 +7,14 @@ import fractions
 
 from numpy.linalg import det
 from SpanFinder import find_span
-from PseudoVols import *
+from PseudoVols import VolumeData
 from cypari import *
 from fractions import Fraction
 from itertools import combinations
 
 EPSILON = .0000000000001
 MAX_COEFF = 4096
+MAX_ITF = 8
 SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']   # globalize
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
@@ -330,11 +331,11 @@ def read_raw_csv_from_file(in_file, seperator = ';'):
 def _up_to_conjugates(z,w):
     zp = re.findall(r'([+-]?[\d.]+)',z)
     wp = re.findall(r'([+-]?[\d.]+)',w)
-    return len(zp) == len(wp) == 2 and zp[0] == wp[0] and _up_to_sign(zp[1],wp[1])
+    return len(zp) == len(wp) == 2 and zp[0] == wp[0] and up_to_sign(zp[1],wp[1])
 
 # Returns true if one of the strings is just -the other
 # Should only be applied to non sci-notation floats' strings
-def _up_to_sign(x,y):
+def up_to_sign(x,y):
     return re.search(r'[\d.]+',x).group() == re.search(r'[\d.]+',y).group()
 
 # Given a+b*I, returns a\pm b*I
@@ -671,7 +672,7 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = 4):
+    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = 4, max_itf_degree = MAX_ITF):
         def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
             if len(self.data[p][r]) == 3:
                 self.data[p][r].extend([list(),0,list()])

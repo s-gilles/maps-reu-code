@@ -224,7 +224,6 @@ class dataset:
 
     # Given a valid Manifold object or manifold name, returns whatever we have on it
     # Form: [InvariantTraceField,Root,Volume,SolutionType,GeomAlternative,NiceAlternative] or None if it couldn't be found
-    # Form: [
     def search_for_manifold(self,man):
         man = str(man)
         for p in self.get_polys():

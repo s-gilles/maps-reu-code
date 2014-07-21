@@ -412,7 +412,7 @@ def read_csv(in_file, seperator = ';', sub_seperator = '|'):
 
 # Returns the list as a string with the given seperator and no brackets
 def list_str(lst,sep):
-    ret = '['
+    ret = ''
     for x in lst:
         ret += str(x)+sep
     return ret[:-1*len(sep)]    # remove extra seperator

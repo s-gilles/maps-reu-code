@@ -8,6 +8,7 @@ from multiprocessing import *
 
 # Until this gets globalized
 EPSILON = .0000000000001    # same as VolumeProcessing
+MAX_ITF = 8                 # ^
 pari.set_real_precision(100)
 
 # The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
@@ -39,6 +40,10 @@ def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max
     finally:
         f.close()
 
+# Count the number of distinct non-zero (<EPSILON) values up to sign
+def _distinct_abs(vol_list):
+    return len(set([abs(v) for v in vol_list if abs(v) >= EPSILON]))   # remove zero volumes
+
 # Returns a VolumeData object containing exotic volumes for manifolds with the given names
 # Volumes' precision is based on pari, so set it there
 # set retrieve = False to skip retrieving ptolemy data from files
@@ -46,8 +51,11 @@ def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max
 # set max_secs to specify how long we will spend computing a given manifolds' data before killing the engine and moving on;
 #   specifying None means we will never give up (unless something crashes)
 # if the engine given crashes, so will IDLE and SnapPy; to avoid this, run this command only from within python scripts.
+# Manifolds with more than floor(max_itf_degree/2) distinct volumes to an obstruction class
+# will have their data for that obstruction class removed, since this demonstrates an invariant trace field with too high ncp
+# Set to None and it will be ignored 
 # TODO: special case max_secs=None to not bother with processes
-def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
+def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True, max_itf_degree = MAX_ITF):
     if engine:
         def _use_engine(v,p):   # this function will be called in a second process to facilitate time limits
             p.send(v.compute_solutions(engine = engine))
@@ -79,6 +87,7 @@ def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True):
                     continue
             if sols:
                 data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
+                data = [p for p in data if _distinct_abs(p[1]) <= max_itf_degree/2] 
                 for d in data:
                     for v in d[1]:
                         recs.setdefault(str(d[0]),dict()).setdefault(str(v),list()).append(nm)

@@ -245,7 +245,7 @@ def read_volumedata_csv(infile, seperator = ';'):
         for l in f.readlines():
             w = l.strip('\n').replace('"','').split(seperator)
             try:
-                data.setdefault(w[0],dict()).setdefault(w[1],list()).append(w[2])
+                data.setdefault(w[0],dict()).setdefault(w[1],list()).append((w[2],int(w[3])))
             except IndexError:  # This was initially for debugging, but it can be useful if you grabbed a file while a line was being written 
                 print 'Malformed Input: '+str(w)
                 continue

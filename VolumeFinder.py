@@ -38,8 +38,6 @@ RE_INV_TRACE_FIELD_NOT_FOUND = re.compile('.*Invariant trace field not found.*',
 RE_FUNC_REQ_GROUP = re.compile('.*Function requires a group.*', re.DOTALL)
 RE_ERROR = re.compile('.*Error.*', re.DOTALL)
 RE_TRACE_FIELD = re.compile('.*Invariant trace field: ([-+*x0-9^ ]+) \[[0-9]+, *([0-9]+)\] [-0-9]+ R\([-0-9]+\) = ([-+*0-9.I]+).*', re.DOTALL)
-RE_BOREL_REG_NOT_COMPUTED = re.compile('.*Borel Regulator: ?not computed.*', re.DOTALL)
-RE_BOREL_REGULATOR = re.compile('.*Borel Regulator: ?\[([-0-9., ]*)\].*', re.DOTALL)
 
 SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']
 
@@ -74,40 +72,8 @@ _worker_to_main_messages = Queue.Queue()
 _full_list = dict()
 _full_list_lock = threading.Lock()
 
-_full_borels = dict()
-_full_borels_lock = threading.Lock()
-
 _discriminants = dict()
 _discriminants_lock = threading.Lock()
-
-_full_dataset = dict()
-
-def set_dataset(dataset):
-    global _full_dataset
-    _full_dataset = dataset
-
-def write_borels_to_output(output_filename = 'output.csv', first_time = True, separator = ';'):
-    global _full_borels, _full_borels_lock
-    with _full_borels_lock:
-        if first_time:
-            f = open(output_filename, 'w')
-            f.write('Name' + separator +
-                    'InvariantTraceField' + separator +
-                    'Root' + separator +
-                    'Borel Regulator\n')
-        else:
-            f = open(output_filename, 'a')
-
-        for poly, poly_dict in _full_borels.items():
-            for root, root_dict in poly_dict.items():
-                for manifold, borel_list in root_dict.items():
-                    f.write(str(manifold) + separator +
-                            str(poly) + separator +
-                            str(root) + separator +
-                            str(borel_list) + '\n')
-
-        f.close()
-            
 
 def write_dict_to_output(output_filename = 'output.csv',  first_time = True, separator = ';'):
     global _full_list, _full_list_lock
@@ -240,7 +206,7 @@ def merge_up_dict(local_dict):
 
 # The action that a worker thread takes.  Simply read from the Queue and
 # perform computations.
-def compute_shape_fields(idx, temp_file_dir = '/tmp/'):
+def compute_shape_fields(idx, temp_file_dir):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     global _snap_process
     global _worker_to_main_messages
@@ -249,7 +215,6 @@ def compute_shape_fields(idx, temp_file_dir = '/tmp/'):
     fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
     full_fname = temp_file_dir + fname
     snap_output = ''
-    _snap_process[idx] = kickoff_snap(temp_file_dir)
     while True:
 
         # This could either be the manifold itself, or the name of a file
@@ -375,173 +340,12 @@ def compute_shape_fields(idx, temp_file_dir = '/tmp/'):
 
     return
 
-def _all_volumes_accounted_for(poly, root, full_dataset, volumes):
-    """Given a polynomial (as string), a root (as string), a dataset
-(a dataset object), and a list of volumes (as strings) from a borel
-regulator, return either a list of tuples (element of borel regulator,
-name of exhibiting manifold) or None if such a list could not be
-constructed."""
-    try:
-        volumes_in_full_dataset = full_dataset.get_volumes(poly,root)
-        matches = list()
-
-        for c_v in volumes:
-            finished_this_cv = False
-            for d_v in volumes_in_full_dataset:
-                if not finished_this_cv and gen.pari('(' + str(c_v) + ' / ' + str(d_v) + ') < 1 + 1e-20') and gen.pari('(' + str(c_v) + ' / ' + str(d_v) + ') > 1 - 1e-20'):
-                    matches.append((d_v, full_dataset.get_nice_manifold_name(poly, root, d_v)))
-                    finished_this_cv = True
-                    
-            if not finished_this_cv:
-                return None
-
-        return matches
-    except:
-        return None
-
-# Merge a dictionary to _full_list. This should be called in turn by each worker
-# thread once the list of manifolds to analyze has been exhausted
-def _merge_up_borels(local_borels):
-    global _full_borels
-    with _full_borels_lock:
-        for polynomial_str, local_polydict in local_borels.items():
-            fulls_polydict = _full_borels.setdefault(polynomial_str, dict())
-            for root, local_rootdict in local_polydict.items():
-                fulls_rootdict = fulls_polydict.setdefault(root, dict())
-                fulls_rootdict.update(local_rootdict)
-    _full_borels = dict()
-
-def compute_borel_regulator(idx, temp_file_dir = '/tmp/'):
-    global SIG_FINISH, SIG_DIE, SIG_MERGE
-    global _snap_process
-    global _worker_to_main_messages
-    global SOL_TYPE_STRINGS
-    global _full_dataset
-    local_borel_results = dict()
-    fname = 'tmp_' + str(os.getpid()) + '_' + str(idx) + '.trig'
-    full_fname = temp_file_dir + fname
+# Wrapper around compute_shape_fields, in case any one-time startup/shutdown
+# code needs to be applied.
+def worker_action(idx, temp_file_dir= '/tmp/'):
     _snap_process[idx] = kickoff_snap(temp_file_dir)
-    snap_output = ''
-    while True:
-        manifold, sig = _ready_manifolds.get()
-
-        if sig is SIG_FINISH:
-            _merge_up_borels(local_borel_results)
-            _ready_manifolds.task_done()
-            break
-        elif sig is SIG_DIE:
-            _ready_manifolds.task_done()
-            break
-        elif sig is SIG_MERGE:
-            _merge_up_borels(local_borel_results)
-            local_borel_reults = dict()
-            _ready_manifolds.task_done()
-            _worker_to_main_messages.put((SIG_MERGE,))
-            continue
-
-        sol_type = SOL_TYPE_STRINGS[-1]
-        sol_enum = int(manifold.solution_type(enum = True))
-        try:
-            sol_type = SOL_TYPE_STRINGS[sol_enum]
-        except:
-            pass
-
-        # Bail if not 'geometric' or 'non-geometric' or 'flat'
-        if sol_enum != 1 and sol_enum != 2 and sol_enum != 3:
-            _ready_manifolds.task_done()
-            continue
-
-        manifold.save(full_fname)
-        while True:
-            try:
-                send_cmd(_snap_process[idx], 'read file ' + fname)
-                if _snap_process[idx].poll() is not None:
-                    raise IOError
-
-                snap_output = send_cmd(_snap_process[idx], 'compute invariant_trace_field compute shape_field print arith')
-                if _snap_process[idx].poll() is not None:
-                    raise IOError
-
-                break
-            except IOError:
-                print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
-                try:
-                    _snap_process[idx].terminate()
-                except:
-                    pass
-                _snap_process[idx] = kickoff_snap(temp_file_dir)
-                continue
-
-        times_retried = 0
-        while True:
-            snap_output = snap_output + drain(_snap_process[idx].stdout)
-            if RE_INV_TRACE_FIELD_NOT_FOUND.match(snap_output):
-                break
-            elif RE_FUNC_REQ_GROUP.match(snap_output):
-                break
-            elif RE_BOREL_REG_NOT_COMPUTED.match(snap_output):
-                break
-            elif RE_ERROR.match(snap_output):
-                print(str(manifold) + ' crashed snap in ' + str(idx) + '!')
-                try:
-                    _snap_process[idx].terminate()
-                except:
-                    pass
-                while True:
-                    try:
-                        _snap_process[idx] = kickoff_snap(temp_file_dir)
-                        break
-                    except Exception as e:
-                        print(str(idx) + ' attempting to recover [' + str(e) + '] ...')
-                        time.sleep(1.5)
-                print(str(idx) + ' recovered')
-                break
-
-            trace_match = RE_TRACE_FIELD.match(snap_output)
-            borel_match = RE_BOREL_REGULATOR.match(snap_output)
-            if borel_match is not None and trace_match is not None:
-                try:
-                    vol = str(manifold.high_precision().volume())
-                except:
-                    print(str(manifold) + ' crashed pari while determining volume in ' + str(idx) + '!')
-                    break
-                polynomial = trace_match.group(1).strip()
-                dm = re.match('x\^([0-9]+).*', polynomial)
-                degree = 0
-                ncp = int(trace_match.group(2).strip())
-                root = trace_match.group(3).strip()
-                borel_vols = borel_match.group(1).split(',')
-
-                borel_matches = _all_volumes_accounted_for(polynomial, root, _full_dataset, borel_vols)
-                if borel_matches is not None:
-                    local_polydict = local_borel_results.setdefault(polynomial, dict())
-                    local_rootdict = local_polydict.setdefault(polynomial, dict())
-                    local_rootdict[str(manifold)] = borel_matches
-                break
-
-            time.sleep(1)
-            try:
-                snap_output = snap_output + send_cmd(_snap_process[idx], '')
-            except IOError:
-                # Force the next RE_ERROR.match to trigger
-                snap_output = 'Error (issue with output?)'
-
-            # This happens extremely rarely, but occasionally snap
-            # will simply hang.  E.g. computing invariant trace field
-            # for 10^3_3(-1,8)(1,3)(1,3)
-            times_retried += 1
-            if times_retried > 20:
-                snap_output = 'Error (snap seems to be hung)'
-
-        _ready_manifolds.task_done()
-
-
-    if _snap_process[idx] is not None:
-        send_cmd(_snap_process[idx], 'quit')
-    _snap_process[idx] = None
-
+    compute_shape_fields(idx, temp_file_dir)
     return
-
 
 def double_sigint_handler(signum, frame):
     print()
@@ -574,8 +378,7 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_locals)
 
 def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12,
-                     install_signal_handlers = True, is_appending = False, csv_separator = ';',
-                     worker_action = compute_shape_fields, output_action = write_dict_to_output):
+                     install_signal_handlers = True, is_appending = False, csv_separator = ';'):
     """Call this, given a batch iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
@@ -660,8 +463,8 @@ Optional parameters:
                 _ready_manifolds.put((None, SIG_MERGE))
             for i in range(0, thread_num):
                 _worker_to_main_messages.get()
-            output_action(output_filename, first_time = not have_written_out_already,
-                          separator = csv_separator)
+            write_dict_to_output(output_filename, first_time = not have_written_out_already,
+                                 separator = csv_separator)
             have_written_out_already = True
             print('Wrote out current progress.')
             try:
@@ -694,5 +497,5 @@ Optional parameters:
     while any(w.is_alive() for w in worker_threads):
         time.sleep(0.05)
 
-    output_action(output_filename, first_time = not have_written_out_already,
-                  separator = csv_separator)
+    write_dict_to_output(output_filename, first_time = not have_written_out_already,
+                         separator = csv_separator)

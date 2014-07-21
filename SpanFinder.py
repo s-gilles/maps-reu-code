@@ -15,7 +15,7 @@ Optionally, the parameter cutoff may be passed (defaulting to 4096). This contro
     # This could be done in the next step, but is singled out as a special case
     # of the general operation.
     base_elts = sorted(elts, key = lambda a: -abs(float(a[0])))
-    base_elts = [(gen.pari(e[0]).abs(), e[1]) for e in base_elts]
+    base_elts = [(e[0].replace('-',''), e[1]) for e in base_elts]   # take absolute value
     independent_elts = []
     while base_elts:
         cur_min_elt = base_elts.pop()

@@ -655,7 +655,10 @@ class SpanData:
                 for r in self.get_roots(p):
                     re = self.data[p][r]
                     f.write('"' + str(p) + '"' + seperator)
-                    f.write('"' + str(dset.get_ncp(p)) + '"' + seperator)
+                    try:
+                        f.write('"' + str(dset.get_ncp(p)) + '"' + seperator)
+                    except: # don't give up because dset was surprised
+                        f.write('"?"' + seperator)
                     f.write('"' + str(r) + '"' + seperator)
                     f.write('"' + str(len(re[0])) + '"' + seperator)
                     f.write('"' + str(re[0]) + '"' + seperator)

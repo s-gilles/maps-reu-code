@@ -85,11 +85,18 @@ def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True, m
                     print 'No engine and no data retrieved; skipping '+nm
                     continue
             if sols:
-                data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
-                data = [p for p in data if _distinct_abs(p[1]) <= max_itf_degree/2] 
-                for d in data:
-                    for v in d[1]:
-                        recs.setdefault(str(d[0]),dict()).setdefault(str(v),list()).append(nm)
+                pairs = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]   # TODO does this flatten do anything?
+                data = list()
+                for p in pairs:
+                    if _distinct_abs(p[1]) <= max_itf_degree/2:
+                        data.append(p)
+                    else:
+                        data.append(None)
+                    # data = [p for p in data if _distinct_abs(p[1]) <= max_itf_degree/2] # arc
+                for cl_idx in xrange(len(data)):
+                    if data[cl_idx]:
+                        for v in data[cl_idx][1]:
+                            recs.setdefault(str(data[cl_idx][0]),dict()).setdefault(str(v),list()).append((nm,cl_idx))
             else:
                 print 'Got no solutions; skipping '+nm
         except Exception as e:
@@ -116,7 +123,7 @@ def _binmiss(s,l):
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
 
-    # structure: dict poly ---> dict volume ---> [manifolds]
+    # structure: dict poly ---> dict volume ---> [(manifold,obstr_cl)]
     def __init__(self, data = dict()):
         self.data = data
 
@@ -127,7 +134,7 @@ class VolumeData:
         return self.data[poly].keys()
 
     def get_manifolds(self,poly,volume):
-        return self.data[poly][volume]
+        return [p[0] for p in self.data[poly][volume]]
 
     # returns a VolumeData object containing the data from this and other; in case of a conflict, other's data takes precendence
     def combine_with(self,other):
@@ -148,20 +155,21 @@ class VolumeData:
             else:
                 f = output_file
             if not append:
-                f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+'\n')
+                f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+seperator+'"ObstrutionClass"'+'\n')
             for p in self.get_polys():
                 for v in self.get_volumes(p):
-                    for m in self.get_manifolds(p,v):
+                    for rec in self.data[p][v]:
                         f.write('"'+p+'"'+seperator)
                         f.write('"'+v+'"'+seperator)
-                        f.write('"'+m+'"\n')
+                        f.write('"'+rec[0]+'"'+seperator)
+                        f.write('"'+str(rec[1])+'"\n')
         finally:
             if type(output_file) == str and f:
                 f.close()
 
     # This filter removes some polynomials with no subfields of degree <= maxsfdegree
     # it doesn't get them all, but does avoid calling nfsubfields; it is quick and approximate.
-    def filter_fields(self, maxsfdegree):
+    def filter_fields(self, maxsfdegree=MAX_ITF):
         def _filter(p): # for a double break
             deg = pari(p).poldegree()
             for n in xrange(maxsfdegree):
@@ -200,7 +208,7 @@ class VolumeData:
                 i += 1
 
     # Removes any volume less than epsilon
-    def remove_zeros(self, epsilon = EPSILON):
+    def remove_nonpositive_vols(self, epsilon = EPSILON):
         for p in self.get_polys():
             for v in self.get_volumes(p):
                 try:
@@ -211,9 +219,9 @@ class VolumeData:
 
     # Runs several methods for decreasing size without losing much information
     # Will remove manifolds if all their pvols were integral multiples of other pvols
-    def clean(self, maxsfdegree, epsilon = EPSILON):
+    def clean(self, maxsfdegree=MAX_ITF, epsilon = EPSILON):
         self.filter_fields(maxsfdegree)
-        self.remove_zeros(epsilon = epsilon)
+        self.remove_nonpositive_vols(epsilon = epsilon)
         self.cull_volumes(epsilon = epsilon)
 
     # Cut down to 1 manifold per poly,vol pair.

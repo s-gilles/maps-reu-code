@@ -4,6 +4,7 @@ from snappy import Manifold
 from cypari import *
 from ManifoldIterators import *
 from multiprocessing import *
+import copy
 
 # Until this gets globalized
 EPSILON = .0000000000001    # same as VolumeProcessing
@@ -127,31 +128,39 @@ def _binmiss(s,l):
 
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
-    """This class is for storage and manipulation of exotic volumes of some manifolds."""
+    """This class is for storage and manipulation of exotic volumes of some manifolds.
+Given a value for data, the constructor makes a VolumeData object wrapping it.
+The datastructure is {poly:{volume:(manifold,obstruction_class_index)}}
+It's usually not nescecary to make these yourself; collection and read methods return them for you."""
 
     # structure: dict poly ---> dict volume ---> [(manifold,obstr_cl)]
     def __init__(self, data = dict()):
         self.data = data
 
     def get_polys(self):
+        """Returns (as a list of strings) the minimal polynomials of the ptolemy/trace fields for the volumes in this object."""
         return self.data.keys()
 
     def get_volumes(self,poly):
+        """Returns (as a list of strings) the volumes that occur over the field with the given minimal polynomial."""
         return self.data[poly].keys()
 
     def get_manifolds(self,poly,volume):
+        """Returns a list of the names of manifolds that produce the given minimal polynomial/volume pair.""" 
         return [p[0] for p in self.data[poly][volume]]
 
-    # returns a VolumeData object containing the data from this and other; in case of a conflict, other's data takes precendence
     def combine_with(self,other):
-        new_data = dict(self.data)
+        """Returns a VolumeData object containing the data from self and other; in case of a conflict (which should not occur), 
+        the other's data takes precedence."""
+        new_data = copy.deepcopy(self.data)
         for p in other.get_polys():
-            new_data.setdefault(p,dict())
-            new_data[p] = list(set(new_data[p].extend(other.get_volume_data(p))))
+            for v in other.get_volumes(p):
+                new_data.setdefault(p,dict()).setdefault(v,list()).extend(other.data[p][v])
         return VolumeData(data = new_data)
 
     # given an (open, ready to write) file object or valid filename, writes the data
     def write_to_csv(self, output_file, seperator = ';', append = False):
+        """Writes out the data to output_file, provided output_file is a valid (open, ready to write) File object or filename."""
         try:
             if type(output_file) == str:
                 if append:

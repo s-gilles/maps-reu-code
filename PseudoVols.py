@@ -10,9 +10,10 @@ EPSILON = .0000000000001    # same as VolumeProcessing
 MAX_ITF = 8                 # ^
 pari.set_real_precision(100)
 
-# The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
-# except output will be written out every period manifolds and logs generated, instead of all at once.
 def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, seperator = ';'):
+    """The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
+except output will be written out every period manifolds and logs generated, instead of all at once."""
+
     ctr = 0
     block = list()
     done = False
@@ -43,18 +44,21 @@ def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max
 def _distinct_abs(vol_list):
     return len(set([abs(v) for v in vol_list if abs(v) >= EPSILON]))   # remove zero volumes
 
-# Returns a VolumeData object containing exotic volumes for manifolds with the given names
-# Volumes' precision is based on pari, so set it there
-# set retrieve = False to skip retrieving ptolemy data from files
-# set engine = None to skip computing ptolemy data in an engine
-# set max_secs to specify how long we will spend computing a given manifolds' data before killing the engine and moving on;
-#   specifying None means we will never give up (unless something crashes)
-# if the engine given crashes, so will IDLE and SnapPy; to avoid this, run this command only from within python scripts.
-# Manifolds with more than floor(max_itf_degree/2) distinct volumes to an obstruction class
-# will have their data for that obstruction class removed, since this demonstrates an invariant trace field with too high ncp
-# Set to None and it will be ignored 
-# TODO: special case max_secs=None to not bother with processes
 def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True, max_itf_degree = MAX_ITF):
+
+    """ Returns a VolumeData object containing exotic volumes for manifolds with the given names
+Volumes' precision is based on pari, so set it there
+set retrieve = False to skip retrieving ptolemy data from files
+set engine = None to skip computing ptolemy data in an engine
+set max_secs to specify how long we will spend computing a given manifolds' data before killing the engine and moving on;
+  specifying None means we will never give up (unless something crashes)
+if the engine given crashes, so will IDLE and SnapPy; to avoid this, run this command only from within python scripts.
+Manifolds with more than floor(max_itf_degree/2) distinct volumes to an obstruction class
+will have their data for that obstruction class removed, since this demonstrates an invariant trace field with too high ncp
+Set to None and it will be ignored.""" 
+
+#TODO: special case max_secs=None to not bother with processes
+
     if engine:
         def _use_engine(v,p):   # this function will be called in a second process to facilitate time limits
             p.send(v.compute_solutions(engine = engine))
@@ -108,6 +112,7 @@ def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True, m
     return VolumeData(data = recs)
 
 def get_potential_trace_fields(poly):
+    """Given a minimal polynomial of a trace field, returns a list of minimal polynomials of the potential invariant trace fields."""
     pol = pari(poly)
     try:
         return [str(rec[0]) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
@@ -122,6 +127,7 @@ def _binmiss(s,l):
 
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
+    """This class is for storage and manipulation of exotic volumes of some manifolds."""
 
     # structure: dict poly ---> dict volume ---> [(manifold,obstr_cl)]
     def __init__(self, data = dict()):
@@ -178,7 +184,7 @@ class VolumeData:
             del self.data[p]
         for p in self.data.keys():
             _filter(p)
-
+    
     # Remove all volumes that are integral multiples of another volume (including 1*)
     # To register as an integral multiple, the decimal part of big/small must be less than epsilon
     # Will remove manifolds if all their pvols were integral multiples of other pvols
@@ -213,9 +219,11 @@ class VolumeData:
             for v in self.get_volumes(p):
                 try:
                     if float(v) < epsilon:
+                        print str(v)+'was less than '+str(epsilon)  # DEBUG
                         del self.data[p][v]
-                except ValueError:  # v was really close to 0
+                except ValueError as e:  # v was really close to 0  # DEBUG as
                     del self.data[p][v]
+                    print str(v)+'threw a value error: '+str(e)     # DEBUG
 
     # Runs several methods for decreasing size without losing much information
     # Will no longer remove manifolds if all their pvols were integral multiples of other pvols

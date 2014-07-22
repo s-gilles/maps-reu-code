@@ -22,12 +22,12 @@ gen.pari.set_real_precision(100)
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
 
-class dataset:
+class Dataset:
     def __init__(self, data_dict = dict()):
         self.data = data_dict
 
     def copy(self):
-        return dataset(self.data.copy())
+        return Dataset(self.data.copy())
 
     def get_polys(self):
         return self.data.keys()
@@ -50,7 +50,7 @@ class dataset:
     def get_volumes(self,poly,root):
         return self.data[poly][0][root].keys()
 
-    # checks if a given polynomial has a record in this dataset
+    # checks if a given polynomial has a record in this Dataset
     def has_poly(self,poly):
         return poly in self.data.keys()
 
@@ -82,8 +82,8 @@ class dataset:
     def cull_all_volumes(self):
         cull_all_volumes(self)
 
-    # Returns a dataset with the data from self and other; in case of a conflict, other's values beat self's or both are kept
-    # Therefore, one is advised to use this on disjoint datasets or pare volumes afterwards
+    # Returns a Dataset with the data from self and other; in case of a conflict, other's values beat self's or both are kept
+    # Therefore, one is advised to use this on disjoint Datasets or pare volumes afterwards
     def combine_with(self,other):
         new_data = dict(self.data)
         for p in other.get_polys():
@@ -96,7 +96,7 @@ class dataset:
                     new_data[p][0][r][v][1].extend(other.get_pared_manifolds(p,r,v))
                     for dim in new_data[p][0][r][v]:
                         dim = list(set(dim))    # Remove duplicates.
-        return dataset(data_dict = new_data)
+        return Dataset(data_dict = new_data)
 
     # Return a triplet containing data for the manifold of smallest volume with the given field
     def get_representative_element(self, poly, root):
@@ -123,7 +123,7 @@ class dataset:
                     newdata[poly][0][root] = {md[0] : [[md[1]],list()]}
             if newdata[poly][0] == dict():  # no roots gave us geometric solutions
                 del newdata[poly]
-        return dataset(data_dict = newdata)
+        return Dataset(data_dict = newdata)
 
     # Returns false if contents look very wrong (no x in polynomial slot, etc.)
     # Only checks very shallowly for the first record data.__iter__.next() returns, so no guarantees
@@ -132,7 +132,7 @@ class dataset:
             try:
                 p = self.data.keys().__iter__().next()
             except StopIteration:
-                return True # empty dataset is sane
+                return True # empty Dataset is sane
             if 'x' not in p:
                 return False
             r = self.get_roots(p).__iter__().next()
@@ -387,7 +387,7 @@ def read_raw_csv(contents, seperator = ';'):
 
         if len(data[w[3]]) == 2:
             data[w[3]].extend(w[7:10])
-    return dataset(data)
+    return Dataset(data)
 
 # Reads a CSV produced by write_csv and returns the contents as a dataset object
 # This variant handles csv's before we swapped column order around a bit.
@@ -402,9 +402,9 @@ def read_old_csv(in_file, seperator = ';'):
         vol_entry[0].append((w[7],w[8],w[9]))
         if len(data[w[0]]) == 2:
             data[w[0]].extend(w[4:7])
-    return dataset(data)
+    return Dataset(data)
 
-# Reads a CSV produced by write_csv and returns the contents as a dataset object
+# Reads a CSV produced by write_csv and returns the contents as a Dataset object
 def read_csv(in_file, seperator = ';', sub_seperator = '|'):
     data = dict()
     for l in in_file.readlines():

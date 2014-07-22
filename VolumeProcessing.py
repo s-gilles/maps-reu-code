@@ -205,16 +205,25 @@ class Dataset:
     def cull_all_volumes(self, epsilon = EPSILON):
         """
         Remove all volumes that are integer multiples of another,
-        smaller volume. These volumes are not pared (and so cannot be
-        retrieved by get_pared_volumes()), they are removed outright
-        from the Dataset. For large Datasests, this may free resources
-        and make dealing with the Dataset faster.
+        smaller volume, where each are for the same polynomial and
+        root. These volumes are not pared (and so cannot be retrieved by
+        get_pared_volumes()), they are removed outright from the
+        Dataset. For large Datasests, this may free resources and make
+        dealing with the Dataset faster.
         """
         for p in self.get_polys():
             for r in self.get_roots(p):
                 self.cull_volumes(p,r,epsilon = epsilon)
 
     def cull_volumes(self,poly,root,epsilon = EPSILON):
+        """
+        Remove all volumes that are integer multiples of another,
+        smaller volume, where each satisfy the given polynomial and
+        root. These volumes are not pared (and so cannot be retrieved by
+        get_pared_volumes()), they are removed outright from the
+        Dataset. For large Datasests, this may free resources and make
+        dealing with the Dataset faster.
+        """
         vols = self.get_volumes(poly,root)
         # vols = self.self[poly][0][root].keys()
         i = 0
@@ -239,11 +248,16 @@ class Dataset:
                     j += 1
             i += 1
 
-
-
-    # Returns a Dataset with the data from self and other; in case of a conflict, other's values beat self's or both are kept
-    # Therefore, one is advised to use this on disjoint Datasets or pare volumes afterwards
     def combine_with(self,other):
+        """
+        Returns a Dataset with the merged contents of other; in case of
+        a conflict, other's values take priority, though both are kept
+        if there would be no conflict (as should be the case for most
+        Datasets).
+
+        Therefore, it is advised to use this on disjoint Datasets or
+        pare volumes afterwards.
+        """
         new_data = dict(self.data)
         for p in other.get_polys():
             new_data.setdefault(p,[dict(),other.get_degree(p),other.get_ncp(p),other.get_disc(p),other.get_factored_disc(p)])
@@ -260,7 +274,7 @@ class Dataset:
     def get_representative_element(self, poly, root):
         """
         Return a triplet containing data for the manifold of smallest
-        volume with the given field
+        volume with the given field.
         """
         minvol = (None, sys.float_info.max)
         for v in self.get_volumes(poly,root):
@@ -274,6 +288,20 @@ class Dataset:
         else:
             for m in self.get_manifold_data(poly,root,minvol[0]):
                 return (minvol[0],m)
+
+    def quick_write_csv(self, filenm, seperator = ';', sub_seperator = '|', append = False):
+        """
+        Write out the Dataset to an output file.  If append is set to
+        False, the file, if extant, is overwritten, if not, the file is
+        assumed to be complete and well-formed, including a header.
+        """
+        try:
+            f = open(filenm,'w')
+            write_csv(f, dataset, seperator = seperator, sub_seperator = sub_seperator, append = append)
+        except:
+            f.close()
+            raise
+
 
     def get_representative_dataset(self):
         """
@@ -566,7 +594,6 @@ def up_to_sign(x,y):
     """
     return re.search(r'[\d.]+',x).group() == re.search(r'[\d.]+',y).group()
 
-# Given a+b*I, returns a\pm b*I
 def _get_conjs(z):
     """
     Given a+b*I (in string form), return a\pm b*I, where \pm is the
@@ -575,6 +602,11 @@ def _get_conjs(z):
     return z[:1]+z[1:].replace('+','\xb1').replace('-','\xb1')
 
 def read_raw_csv(contents, seperator = ';'):
+    """
+    Read in csv of the form
+
+    Name;InvariantTraceField;Root;NumberOfComplexPlaces;Volume;InvariantTraceFieldDegree;SolutionType;Disc;DiscFactors;Tetrahedra
+    """
     data = dict()
     # Obviously this code is highly sensative to any changes in the output format of VolumeFinder.py
     for l in contents:
@@ -614,9 +646,12 @@ def read_raw_csv(contents, seperator = ';'):
             data[w[3]].extend(w[7:10])
     return Dataset(data)
 
-# Reads a CSV produced by write_csv and returns the contents as a dataset object
-# This variant handles csv's before we swapped column order around a bit.
 def read_old_csv(in_file, seperator = ';'):
+    """
+    Reads a CSV produced by write_csv and returns the contents as a
+    dataset object.  This variant handles csvs before we swapped column
+    order around a bit.
+    """
     data = dict()
     for l in in_file.readlines():
         if seperator == ',':    # again special cased
@@ -629,14 +664,12 @@ def read_old_csv(in_file, seperator = ';'):
             data[w[0]].extend(w[4:7])
     return Dataset(data)
 
-# Reads a CSV produced by write_csv and returns the contents as a Dataset object
 def read_csv(in_file, seperator = ';', sub_seperator = '|'):
     """
     Read in a csv (without header) and return a Dataset object
     representing it.  The csv should be in the following form:
 
     Name;InvariantTraceField;Root;NumberOfComplexPlaces;Volume;InvariantTraceFieldDegree;SolutionType;Disc;DiscFactors;Tetrahedra
-
     """
     data = dict()
     for l in in_file.readlines():
@@ -654,8 +687,11 @@ def read_csv(in_file, seperator = ';', sub_seperator = '|'):
             data[w[1]].extend([w[3],w[7],w[8]])
     return Dataset(data)
 
-# Returns the list as a string with the given seperator and no brackets
-def list_str(lst,sep):
+def _list_str(lst,sep):
+    """
+    Returns the list as a string with the given seperator and no
+    brackets.
+    """
     ret = ''
     for x in lst:
         ret += str(x)+sep
@@ -694,15 +730,7 @@ def write_csv(out_file, dataset, seperator = ';', sub_seperator = '|', append=Fa
                     out_file.write('"'+disc+'"'+seperator)
                     out_file.write('"'+fact_disc+'"'+seperator)
                     out_file.write('"'+m[1]+seperator)
-                    out_file.write('"'+list_str(dataset.get_pared_manifolds(p,r,v),sub_seperator).replace(' ','')+'"\n')
-
-def quick_write_csv(dataset, filenm, seperator = ';', sub_seperator = '|', append = False):
-    try:
-        f = open(filenm,'w')
-        write_csv(f, dataset, seperator = seperator, sub_seperator = sub_seperator, append = append)
-    except:
-        f.close()
-        raise
+                    out_file.write('"'+_list_str(dataset.get_pared_manifolds(p,r,v),sub_seperator).replace(' ','')+'"\n')
 
 #### For backwards compatability
 def pare_all_volumes(data):
@@ -716,6 +744,12 @@ def cull_all_volumes(data, epsilon = EPSILON):
     Deprecated.  Use data.cull_all_volumes() instead
     """
     data.cull_all_volumes(epsilon)
+
+def quick_write_csv(data, filenm, seperator = ';', sub_seperator = '|', append = False):
+    """
+    Deprecated.  Use data.quick_write_csv() instead
+    """
+    data.quick_write_csv(filenm, seperator, sub_seperator, append)
 
 def _span_guesses(data):
     spans = dict()

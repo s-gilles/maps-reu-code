@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import copy
 import re
 import sys
 import traceback
@@ -23,71 +24,229 @@ gen.pari.set_real_precision(100)
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
 
 class Dataset:
+    """
+    A class representing a collection of computed volumes. This is
+    really a wrapper around a nested structure of dictionaries of
+    dictionaries of.
+
+    This class should probably not be constructed directly.  Rather, it
+    should be created through a method like read_csv()
+    """
     def __init__(self, data_dict = dict()):
         self.data = data_dict
 
+    def __str__(self):
+        return str(self.data)
+
     def copy(self):
-        return Dataset(self.data.copy())
+        """
+        Return another dataset containing a copy of the data that this
+        Dataset represents.
+        """
+        return Dataset(copy.deepcopy(self.data))
 
     def get_polys(self):
+        """
+        Return all trace fields as polynomials (in string form) recorded
+        by this Dataset.
+        """
         return self.data.keys()
 
     def get_roots(self,poly):
+        """
+        Return all roots of a given trace field (as a polynomial in
+        string form) recorded by this Dataset.
+
+        Raises KeyError if the polynomial is not in the Dataset.
+        """
         return self.data[poly][0].keys()
 
     def get_degree(self,poly):
+        """Get the degree of this polynomial (input as a string) inside this
+        Dataset.  This should be equivalent to
+
+        gen.pari(poly).poldegree()
+
+        Discrepancies may reveal issues with the data that constructed
+        this Dataset.
+        """
         return self.data[poly][1]
 
     def get_ncp(self,poly):
+        """
+        Get the number of complex places of this polynomial (input as a
+        string) recorded by this Dataset.
+        """
         return self.data[poly][2]
 
     def get_disc(self,poly):
+        """
+        Get the discriminant of this polynomial (input as a string)
+        recorded by this Dataset. This should be equal to
+
+        gen.pari(poly).nfdisc()
+
+        Discrepancies may reveal issues with the data that
+        constructed this Dataset.
+        """
         return self.data[poly][3]
 
     def get_factored_disc(self,poly):
+        """
+        Get the factored discriminant of this polynomial, as a
+        human-readable string of prime power factorization. The string
+        it returns should (in the obvious way) represent the same
+        factorization as
+
+        gen.pari(pol).nfdisc().factor()
+
+        Discrepancies may reveal issues with the data that
+        constructed this Dataset.
+        """
         return self.data[poly][4]
 
     def get_volumes(self,poly,root):
+        """
+        Return, as a list of strings, each volume for the given
+        polynomial (input as string) and root (input as string) recorded
+        in this Dataset.
+        """
         return self.data[poly][0][root].keys()
 
-    # checks if a given polynomial has a record in this Dataset
     def has_poly(self,poly):
+        """
+        Returns true if there is any volume stored for the given
+        polynomial (input as a string) in this Dataset.
+        """
         return poly in self.data.keys()
 
     # returns a geometric manifold's record, or None failing that
     def get_geom_manifold(self,poly,root,vol):
+        """
+        Given a polynomial, a root, and a volume (as strings), return either a triple
+        (manifold name, number of simplices, solution type) where
+
+        manifold name is a string
+
+        number of simplices is an integer reflecting the triangulation
+        that was recorded in this Dataset
+
+        solution type is the string 'geometric')
+
+        If no such triple can be found, (None, None, None) is returned.
+        """
         for rec in self.get_manifold_data(poly,root,vol):
             if rec[2] == 'geometric':
                 return rec
         return (None,None,None)
 
-    # Returns triplets of a manifold's name, number of simplices, and solution type
     def get_manifold_data(self,poly,root,vol):
+        """
+        Returns an arbitrarily chosen triple (manifold name, number of
+        simplices, solution type) for a given polynomial, root, and
+        volume, where
+
+        manifold name is a string
+
+        number of simplices is an integer reflecting the triangulation
+        that was recorded in this Dataset
+
+        solution type is a string corresponding to a short description
+        of Manifold.get_solution_type() for the triangulation that was
+        recorded in this Dataset.
+        """
         return self.data[poly][0][root][vol][0]
 
-    # Returns names of manifolds with vol that weren't chosen as representative
     def get_pared_manifolds(self,poly,root,vol):
+        """
+        When a Dataset is pared, multiple manifolds that meet the same
+        polynomial, root, volume triple are compressed, with only one
+        representative volume stored.  The names of manifolds which were
+        not chosen to be this representative volume are also recorded,
+        and may be retrieved by this method.
+        """
         return self.data[poly][0][root][vol][1]
 
-    # Removes a volume, returning its manifold data
     def remove_volume(self,poly,root,vol):
+        """
+        Remove a volume from the dataset.  This will not work if the
+        volume has been already removed by paring. If the last volume
+        for a root, or the last root for a polynomial is removed, the
+        higher-level element will be removed as well.
+        """
         rec = self.data[poly][0][root].get(vol)
         del self.data[poly][0][root][vol]
         return rec
 
-    # These point to non-instance functions of the same name
     def pare_all_volumes(self):
-        pare_all_volumes(self)
+        """
+        Compress all matching (polynomial, root, volume) triples, so
+        that only one representative manifold is stored.  Manifolds
+        which are discarded have their names stored, and can be
+        retrieved by get_pared_volumes()
+        """
+        for p in self.get_polys():
+            for r in self.get_roots(p):
+                for v in self.get_volumes(p,r):
+                    self.pare_volume(data,p,r,v)
 
-    def cull_all_volumes(self):
-        cull_all_volumes(self)
+    def pare_volume(self,poly,root,vol):
+        """
+        Compress a (polynomial, root, volume) triple, so that only one
+        representative manifold is stored for it.  Manifolds which are
+        discarded have their names stored, and can be retrieved by
+        get_pared_volumes()
+        """
+        mdata = self..get_manifold_data(poly,root,vol)
+        mpared = self.get_pared_manifolds(poly,root,vol)
+        while len(mdata) > 1:
+            mpared.append(mdata.pop(1)[0])
+
+    def cull_all_volumes(self, epsilon = EPSILON):
+        """
+        Remove all volumes that are integer multiples of another,
+        smaller volume. These volumes are not pared (and so cannot be
+        retrieved by get_pared_volumes()), they are removed outright
+        from the Dataset. For large Datasests, this may free resources
+        and make dealing with the Dataset faster.
+        """
+        for p in self.get_polys():
+            for r in self.get_roots(p):
+                self.cull_volumes(p,r,epsilon = epsilon)
+
+    def cull_volumes(self,poly,root,epsilon = EPSILON):
+        vols = self.get_volumes(poly,root)
+        # vols = self.self[poly][0][root].keys()
+        i = 0
+        while i < len(vols) - 1:
+            j = i + 1
+            while j < len(vols):
+                try:
+                    if is_int(float(vols[i])/float(vols[j]), epsilon = epsilon) and gen.pari(vols[i] + ' > ' + vols[j]):
+                        # We have to throw away (culled) manifold names to let all culled manifolds have the same volume
+                        # [j] divides [i] so remove [i]
+                        self.remove_volume(poly,root,vols.pop(i))
+                        # i is already effectivley incremented, so we must offset it
+                        i = i-1
+                        break
+                    elif is_int(float(vols[j])/float(vols[i]), epsilon = epsilon):
+                        # this time, remove [j]
+                        self.remove_volume(poly,root,vols.pop(j))
+                        # j is effectivley incremented, no need to do it
+                    else:
+                        j += 1
+                    except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
+                    j += 1
+            i += 1
+
+
 
     # Returns a Dataset with the data from self and other; in case of a conflict, other's values beat self's or both are kept
     # Therefore, one is advised to use this on disjoint Datasets or pare volumes afterwards
     def combine_with(self,other):
         new_data = dict(self.data)
         for p in other.get_polys():
-            new_data.setdefault(p,[dict(),other.get_degree(p),other.get_ncp(p),other.get_disc(p),other.get_factored_disc(p)])           
+            new_data.setdefault(p,[dict(),other.get_degree(p),other.get_ncp(p),other.get_disc(p),other.get_factored_disc(p)])
             for r in other.get_roots(p):
                 new_data[p][0].setdefault(r,dict())
                 for v in other.get_volumes(p,r):
@@ -98,9 +257,12 @@ class Dataset:
                         dim = list(set(dim))    # Remove duplicates.
         return Dataset(data_dict = new_data)
 
-    # Return a triplet containing data for the manifold of smallest volume with the given field
     def get_representative_element(self, poly, root):
-        minvol = (None, sys.float_info.max)       
+        """
+        Return a triplet containing data for the manifold of smallest
+        volume with the given field
+        """
+        minvol = (None, sys.float_info.max)
         for v in self.get_volumes(poly,root):
             try:
                 if float(v) < minvol[1]:
@@ -114,6 +276,9 @@ class Dataset:
                 return (minvol[0],m)
 
     def get_representative_dataset(self):
+        """
+        Returns a new Dataset,
+        """
         newdata = dict()
         for poly in self.get_polys():
             newdata[poly] = [dict()]+self.data[poly][1:]    # initialize list of volumes to be empty
@@ -128,6 +293,11 @@ class Dataset:
     # Returns false if contents look very wrong (no x in polynomial slot, etc.)
     # Only checks very shallowly for the first record data.__iter__.next() returns, so no guarantees
     def sane(self):
+        """
+        Returns false if contents look very wrong (no x in polynomial
+        slot, etc.). This is only a shallow check, and this function
+        returning True is no guarantee that the Dataset has no errors.
+        """
         try:
             try:
                 p = self.data.keys().__iter__().next()
@@ -161,8 +331,11 @@ class Dataset:
             return False    # unexpected errors probably mean we aren't sane
         return True
 
-    # removes all manifolds from all volumes if they are anything but 'geometric'
     def remove_non_geometric_elements(self):
+        """
+        Delete all volumes if they have any solution type except
+        geometric.
+        """
         to_kill = list()
         for poly,polyinf in self.data.items():
             polydict = polyinf[0]
@@ -180,8 +353,11 @@ class Dataset:
             if not self.get_roots(p):
                 del self.data[p]
 
-    # Currently returns the shortest choice; could be made more sophisticated
     def get_nice_manifold_name(self,poly,root,vol):
+        """
+        For a (polynomial, root, volume) triple (all input a strings),
+        return the ``nicest'' matching manifold.
+        """
         nms = [rec[0] for rec in self.get_manifold_data(poly,root,vol)]
         nms.extend(self.get_pared_manifolds(poly,root,vol))
         opt = ('', sys.float_info.max)
@@ -190,15 +366,22 @@ class Dataset:
                 opt = (nm,len(nm))
         return opt[0]
 
-    # If some volumes differ by less than epsilon, combine them, keeping one of them arbitrarily.
-    # Slightly nondeterministic; may not get large, dense (compared to epsilon) clumps if iteration order is unfavorable.
-    # But that is very unlikely to happen,
-    # and when it is (lattice generators very close to each other) you don't want smush to work anyway
-    # Only usefull if you don't want to cull;
-    # Only briefly tested
-    def smush_volumes(self, epsilon = EPSILON):
+    def smush_volumes(self, epsilon = EPSILON)
+        """
+        If some volumes differ by less than epsilon, combine them,
+        keeping one of them arbitrarily.
+
+        Note: This method is slightly nondeterministic; may not
+        get large, dense (compared to epsilon) clumps if iteration order is
+        unfavorable.  However, that is very unlikely to happen, and when it is
+        (lattice generators very close to each other) you don't want smush
+        to work anyway.
+
+        Note: This method is supreceded by cull_all_volumes(), and has
+        only been briefly tested.
+        """:
         d = self.copy()
-        balls = list()        
+        balls = list()
         for p in d.get_polys():
             for r in d.get_roots(p):
                 vol_data = d.data[p][0][r]
@@ -277,10 +460,10 @@ def _niceness(nm):
         n += 10
     # n *= gap TODO
     # apply dehn penalties TODO
-    return n                
+    return n
 
 def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
-    try:    
+    try:
         f = open(filenm,'r')
         f.readline()
         d = read_csv(f, seperator = seperator, sub_seperator = sub_seperator)
@@ -290,7 +473,7 @@ def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
         if f:
             f.close()
         raise
-        
+
 
 # combines two output files from this program
 def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
@@ -380,7 +563,7 @@ def read_raw_csv(contents, seperator = ';'):
         # w[8]: polynomial discriminant -----------------> data[poly][3]
         # w[9]: polynomial discriminant (factorized) ----> data[poly][4]
         # vr = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[2],[list(),list(),w[5]])[0].append(w[0:2]) # OLD
-        # # why was vr set just now and not used? 
+        # # why was vr set just now and not used?
         vol_entry = data.setdefault(w[3],[dict(),w[4]])[0].setdefault(w[5],dict()).setdefault(w[2],[list(),list()])
 
         vol_entry[0].append((w[0],w[1],w[6]))
@@ -420,7 +603,7 @@ def read_csv(in_file, seperator = ';', sub_seperator = '|'):
         vol_entry[1] = list(set(vol_entry[1]))  # remove duplicates
         if len(data[w[1]]) == 2:
             data[w[1]].extend([w[3],w[7],w[8]])
-    return dataset(data)
+    return Dataset(data)
 
 # Returns the list as a string with the given seperator and no brackets
 def list_str(lst,sep):
@@ -465,56 +648,25 @@ def write_csv(out_file, dataset, seperator = ';', sub_seperator = '|', append=Fa
                     out_file.write('"'+list_str(dataset.get_pared_manifolds(p,r,v),sub_seperator).replace(' ','')+'"\n')
 
 def quick_write_csv(dataset, filenm, seperator = ';', sub_seperator = '|', append = False):
-    try:    
+    try:
         f = open(filenm,'w')
         write_csv(f, dataset, seperator = seperator, sub_seperator = sub_seperator, append = append)
     except:
         f.close()
         raise
 
-# Removes redundant manifold records with the same trace field (and root) and volume
+#### For backwards compatability
 def pare_all_volumes(data):
-    for p in data.get_polys():
-        for r in data.get_roots(p):
-            for v in data.get_volumes(p,r):
-                pare_volume(data,p,r,v)
+    """
+    Deprecated.  Use data.pare_all_volumes() instead
+    """
+    data.pare_all_volumes()
 
-def pare_volume(data,poly,root,vol): # move these 4 methods into the class
-    mdata = data.get_manifold_data(poly,root,vol)
-    mpared = data.get_pared_manifolds(poly,root,vol)
-    while len(mdata) > 1:
-        mpared.append(mdata.pop(1)[0])
-
-# Removes volumes that are integer multiples of another volume
 def cull_all_volumes(data, epsilon = EPSILON):
-    for p in data.get_polys():
-        for r in data.get_roots(p):
-            cull_volumes(data,p,r,epsilon = epsilon)
-
-def cull_volumes(data,poly,root,epsilon = EPSILON):
-    vols = data.get_volumes(poly,root)
-    # vols = data.data[poly][0][root].keys()
-    i = 0
-    while i < len(vols) - 1:
-        j = i + 1
-        while j < len(vols):
-            try:
-                if is_int(float(vols[i])/float(vols[j]), epsilon = epsilon) and gen.pari(vols[i] + ' > ' + vols[j]):
-                    # We have to throw away (culled) manifold names to let all culled manifolds have the same volume
-                    # [j] divides [i] so remove [i]
-                    data.remove_volume(poly,root,vols.pop(i))
-                    # i is already effectivley incremented, so we must offset it
-                    i = i-1
-                    break
-                elif is_int(float(vols[j])/float(vols[i]), epsilon = epsilon):
-                    # this time, remove [j]
-                    data.remove_volume(poly,root,vols.pop(j))
-                    # j is effectivley incremented, no need to do it
-                else:
-                    j += 1
-            except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
-                j += 1
-        i += 1
+    """
+    Deprecated.  Use data.cull_all_volumes() instead
+    """
+    data.cull_all_volumes(epsilon)
 
 def _span_guesses(data):
     spans = dict()
@@ -562,7 +714,7 @@ def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
     d = read_raw_csv(lines)
     d.remove_non_geometric_elements()
     write_spans(out_filename, d, seperator = out_seperator)
-    
+
 def read_spans(fname, seperator = ';'):
     f = open(fname,'r')
     f.readline()
@@ -578,7 +730,7 @@ def read_spans(fname, seperator = ';'):
     return spans
 
 def write_spans(fname, dataset, seperator = ';'):
-    d = dataset # lazy    
+    d = dataset # lazy
     s = _span_guesses(d)
     f = open(fname, 'w')
     f.write('Polynomial' + seperator + 'NumberOfComplexPlaces' + seperator + 'Root' + seperator + 'SpanDimension' + seperator + 'VolumeSpan' + seperator + 'ManifoldSpan' + seperator + 'FitRatio\n')
@@ -599,7 +751,7 @@ def write_spans(fname, dataset, seperator = ';'):
 # poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
 # poly : root : [[spanning_vols], fit_ratio, [spanning_names], [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
 # The latter form is used after deciding to fit some pseudovols (as a VolumeData) against a SpanData;
-# Doing so produces a VolumeData of those pseudovols we just couldn't fit, which can be written out as usual 
+# Doing so produces a VolumeData of those pseudovols we just couldn't fit, which can be written out as usual
 # Also, this seems prone (for some reason) to causing stack overflows in PARI
 class SpanData:
 
@@ -731,7 +883,7 @@ class SpanData:
                 if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play
                     if self.data[p][r][5]:  # TODO: make this record if coeff > fit ratio
                         dim = len(self.data[p][r][0])
-                        vecs = list()                    
+                        vecs = list()
                         for n in xrange(dim):   # put in basis unit vectors
                             vecs.append([0]*dim)
                             vecs[n][n] = 1
@@ -772,7 +924,7 @@ class SpanData:
     # Writes out the linear combinations producing exotic volumes in a relatively readable format as described below
     # The format for the combination is:
     # k*exotic_man=k*man_1+-k*man_2+-k*man_3...
-    # where k are some nonzero integers (so no if one is negative), +- is + or -, exotic_man is Manifold, 
+    # where k are some nonzero integers (so no if one is negative), +- is + or -, exotic_man is Manifold,
     # and the other manifolds names stand in for their geometric volumes
     def write_nice_fits(self, outfile, seperator = ';', append = False):
         if type(outfile) == str:
@@ -812,10 +964,10 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-# returns a SpanData for the given dataset                                    
+# returns a SpanData for the given dataset
 def get_data_object(dset):
     return SpanData(_span_guesses(dset))
-    
+
 
 # Accepts volumes as strings since we store them that way.
 # Returns the dependancy found (if any) as a list of integers if all coefficents are <= maxcoeff or maxcoeff is nonpositive;

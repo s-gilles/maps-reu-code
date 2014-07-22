@@ -420,7 +420,7 @@ def read_csv(in_file, seperator = ';', sub_seperator = '|'):
         vol_entry[1] = list(set(vol_entry[1]))  # remove duplicates
         if len(data[w[1]]) == 2:
             data[w[1]].extend([w[3],w[7],w[8]])
-    return dataset(data)
+    return Dataset(data)
 
 # Returns the list as a string with the given seperator and no brackets
 def list_str(lst,sep):
@@ -717,7 +717,6 @@ class SpanData:
                 self.nice_fits.setdefault(rec[1],dict()).setdefault(cand[0][0],dict()).setdefault(cand[0][1],dict())[rec[0]] = cand[1]
             else:       # no rational fit, store the failure
                 self.fit_fails.setdefault(p,list()).append(rec)
-                # TODO store a trivial nicefits entry here
         if not self.fitted:
             self.fitted = True
             if not self.fit_fails:
@@ -804,7 +803,7 @@ class SpanData:
             for p in self.fit_fails.keys():
                 for rec in self.fit_fails[p]:
                     f.write('"'+str(rec[1])+'"'+seperator)
-                    f.write('"'+str(p)+'"'+seperator)
+                    f.write('"'+str(pari(str(p)).polredabs())+'"'+seperator)
                     f.write('"'+'TraceField'+'"'+seperator)
                     f.write('"'+str(rec[0])+'"'+seperator)
                     f.write('"'+'None'+'"\n')

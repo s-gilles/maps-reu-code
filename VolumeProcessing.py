@@ -188,7 +188,7 @@ class Dataset:
         for p in self.get_polys():
             for r in self.get_roots(p):
                 for v in self.get_volumes(p,r):
-                    self.pare_volume(data,p,r,v)
+                    self.pare_volume(p,r,v)
 
     def pare_volume(self,poly,root,vol):
         """
@@ -483,9 +483,7 @@ def _niceness(nm):
 def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
     """
     Read in a csv (with header) and return a Dataset object representing
-    it.  The csv should be in the form:
-
-    Name;InvariantTraceField;Root;NumberOfComplexPlaces;Volume;InvariantTraceFieldDegree;SolutionType;Disc;DiscFactors;Tetrahedra
+    it.  The csv should be in the form exected by read_csv
     """
     try:
         f = open(filenm,'r')
@@ -548,23 +546,32 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
 def read_raw_csv_from_file(in_file, seperator = ';'):
     """
     Read raw csv data in.  A header is not expected.  The file should be
-    in the same format as expected by 
+    in the same format as expected by read_csv
     """
     return read_raw_csv(in_file.readlines(), seperator)
 
-# Returns true if the given strings are equal or complex conjugates as formatted by snap: a+b*I, a-b*I
 def _up_to_conjugates(z,w):
+    """
+    Returns true if the given strings are equal or complex conjugates as
+    formatted by snap: a+b*I, a-b*I
+    """
     zp = re.findall(r'([+-]?[\d.]+)',z)
     wp = re.findall(r'([+-]?[\d.]+)',w)
     return len(zp) == len(wp) == 2 and zp[0] == wp[0] and up_to_sign(zp[1],wp[1])
 
-# Returns true if one of the strings is just -the other
-# Should only be applied to non sci-notation floats' strings
 def up_to_sign(x,y):
+    """
+    Returns true if one of the strings is just -the other. This method
+    should only be applied to non sci-notation floats' strings
+    """
     return re.search(r'[\d.]+',x).group() == re.search(r'[\d.]+',y).group()
 
 # Given a+b*I, returns a\pm b*I
 def _get_conjs(z):
+    """
+    Given a+b*I (in string form), return a\pm b*I, where \pm is the
+    unicode plus/minus character.
+    """
     return z[:1]+z[1:].replace('+','\xb1').replace('-','\xb1')
 
 def read_raw_csv(contents, seperator = ';'):
@@ -624,6 +631,13 @@ def read_old_csv(in_file, seperator = ';'):
 
 # Reads a CSV produced by write_csv and returns the contents as a Dataset object
 def read_csv(in_file, seperator = ';', sub_seperator = '|'):
+    """
+    Read in a csv (without header) and return a Dataset object
+    representing it.  The csv should be in the following form:
+
+    Name;InvariantTraceField;Root;NumberOfComplexPlaces;Volume;InvariantTraceFieldDegree;SolutionType;Disc;DiscFactors;Tetrahedra
+
+    """
     data = dict()
     for l in in_file.readlines():
         if seperator == ',':    # again special cased

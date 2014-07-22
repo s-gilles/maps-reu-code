@@ -7,10 +7,11 @@ import fractions
 
 from numpy.linalg import det
 from SpanFinder import find_span
-from PseudoVols import VolumeData
+from PseudoVols import VolumeData, get_potential_trace_fields
 from cypari import *
 from fractions import Fraction
 from itertools import combinations
+from snappy import *
 
 EPSILON = .0000000000001
 MAX_COEFF = 4096
@@ -562,14 +563,18 @@ def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
     d.remove_non_geometric_elements()
     write_spans(out_filename, d, seperator = out_seperator)
     
-
 def read_spans(fname, seperator = ';'):
     f = open(fname,'r')
     f.readline()
     spans = dict()
     for l in f.readlines():
-        w = l.replace('"','').strip('\n').split(seperator)
-        spans.setdefault(w[0],dict())[w[2]] = w[4:]    # with any luck, this is only set once
+        w = l.replace('"','').replace(' ','').strip('\n').split(seperator)  # whitespace can cause weird problems
+        for i in [4,5,7,8,9,10]:
+            try:
+                w[i] = w[i][2:-2].split("','")    # convert string back to list of strings
+            except IndexError:
+                break
+        spans.setdefault(w[0],dict())[w[2]] = w[4:]
     return spans
 
 def write_spans(fname, dataset, seperator = ';'):
@@ -655,7 +660,10 @@ class SpanData:
                 for r in self.get_roots(p):
                     re = self.data[p][r]
                     f.write('"' + str(p) + '"' + seperator)
-                    f.write('"' + str(dset.get_ncp(p)) + '"' + seperator)
+                    try:
+                        f.write('"' + str(dset.get_ncp(p)) + '"' + seperator)
+                    except: # don't give up because dset was surprised
+                        f.write('"?"' + seperator)
                     f.write('"' + str(r) + '"' + seperator)
                     f.write('"' + str(len(re[0])) + '"' + seperator)
                     f.write('"' + str(re[0]) + '"' + seperator)
@@ -709,6 +717,7 @@ class SpanData:
                 self.nice_fits.setdefault(rec[1],dict()).setdefault(cand[0][0],dict()).setdefault(cand[0][1],dict())[rec[0]] = cand[1]
             else:       # no rational fit, store the failure
                 self.fit_fails.setdefault(p,list()).append(rec)
+                # TODO store a trivial nicefits entry here
         if not self.fitted:
             self.fitted = True
             if not self.fit_fails:
@@ -786,12 +795,19 @@ class SpanData:
                                 if n != 0 and -1*ldp[n] > 0:  # don't add a plus sign for the first term
                                     comb += '+'
                                 if ldp[n] != 0:
-                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[2][n]
+                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[1][n]
                             f.write('"'+m+'"'+seperator)
                             f.write('"'+itf+'"'+seperator)
                             f.write('"'+r+'"'+seperator)
                             f.write('"'+v+'"'+seperator)
                             f.write('"'+comb+'"\n')
+            for p in self.fit_fails.keys():
+                for rec in self.fit_fails[p]:
+                    f.write('"'+str(rec[1])+'"'+seperator)
+                    f.write('"'+str(p)+'"'+seperator)
+                    f.write('"'+'TraceField'+'"'+seperator)
+                    f.write('"'+str(rec[0])+'"'+seperator)
+                    f.write('"'+'None'+'"\n')
         finally:
             if type(outfile) == str:
                 f.close()
@@ -799,6 +815,7 @@ class SpanData:
 # returns a SpanData for the given dataset                                    
 def get_data_object(dset):
     return SpanData(_span_guesses(dset))
+    
 
 # Accepts volumes as strings since we store them that way.
 # Returns the dependancy found (if any) as a list of integers if all coefficents are <= maxcoeff or maxcoeff is nonpositive;
@@ -809,12 +826,7 @@ def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
 
     num_tries = 0
     while num_tries < max_tries:
-        try:
-            vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
-            break
-        except:
-            print 'Stack overflow, retrying...'
-            pass
+        vec = str(pari(str(vols).replace("\'",'')).lindep())[1:-2].replace(' ','').split(',')
         num_tries += 1
 
     if not vec or vec == ['']: # no input

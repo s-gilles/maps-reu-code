@@ -170,7 +170,7 @@ It's usually not nescecary to make these yourself; collection and read methods r
             else:
                 f = output_file
             if not append:
-                f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+seperator+'"ObstrutionClass"'+'\n')
+                f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+seperator+'"ObstructionClass"'+'\n')
             for p in self.get_polys():
                 for v in self.get_volumes(p):
                     for rec in self.data[p][v]:

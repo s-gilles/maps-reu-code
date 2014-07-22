@@ -11,6 +11,7 @@ from PseudoVols import VolumeData, get_potential_trace_fields
 from cypari import *
 from fractions import Fraction
 from itertools import combinations
+from snappy import *
 
 EPSILON = .0000000000001
 MAX_COEFF = 4096
@@ -700,8 +701,6 @@ class SpanData:
                         if 'Error' in self.data[tf][r]:
                             print 'Couldn\'t handle '+str(self.data[tf][r]) # can't handle the format
                             continue                                        # so we skip this one
-                        print type(self.get_spans(tf,r)[0])
-                        print self.get_spans(tf,r)[0]
                         ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff, max_tries = max_ldp_tries)
                         if ldp and ldp[-1] != 0:
                             if abs(ldp[-1]) == 1:    # the match was perfect, update the data
@@ -820,12 +819,7 @@ def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
 
     num_tries = 0
     while num_tries < max_tries:
-        try:
-            vec = str(pari(str(vols).replace('\'','')).lindep())[1:-2].replace(' ','').split(',')
-            break
-        except:
-            print 'Stack overflow, retrying...'
-            pass
+        vec = str(pari(str(vols).replace("\'",'')).lindep())[1:-2].replace(' ','').split(',')
         num_tries += 1
 
     if not vec or vec == ['']: # no input

@@ -562,14 +562,18 @@ def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
     d.remove_non_geometric_elements()
     write_spans(out_filename, d, seperator = out_seperator)
     
-
 def read_spans(fname, seperator = ';'):
     f = open(fname,'r')
     f.readline()
     spans = dict()
     for l in f.readlines():
-        w = l.replace('"','').strip('\n').split(seperator)
-        spans.setdefault(w[0],dict())[w[2]] = w[4:]    # with any luck, this is only set once
+        w = l.replace('"','').replace(' ','').strip('\n').split(seperator)  # whitespace can cause weird problems
+        for i in [4,5,7,8,9,10]:
+            try:
+                w[i] = w[i][2:-2].split("','")    # convert string back to list of strings
+            except IndexError:
+                break
+        spans.setdefault(w[0],dict())[w[2]] = w[4:]
     return spans
 
 def write_spans(fname, dataset, seperator = ';'):
@@ -696,6 +700,8 @@ class SpanData:
                         if 'Error' in self.data[tf][r]:
                             print 'Couldn\'t handle '+str(self.data[tf][r]) # can't handle the format
                             continue                                        # so we skip this one
+                        print type(self.get_spans(tf,r)[0])
+                        print self.get_spans(tf,r)[0]
                         ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff, max_tries = max_ldp_tries)
                         if ldp and ldp[-1] != 0:
                             if abs(ldp[-1]) == 1:    # the match was perfect, update the data
@@ -712,6 +718,7 @@ class SpanData:
                 self.nice_fits.setdefault(rec[1],dict()).setdefault(cand[0][0],dict()).setdefault(cand[0][1],dict())[rec[0]] = cand[1]
             else:       # no rational fit, store the failure
                 self.fit_fails.setdefault(p,list()).append(rec)
+                # TODO store a trivial nicefits entry here
         if not self.fitted:
             self.fitted = True
             if not self.fit_fails:
@@ -802,6 +809,7 @@ class SpanData:
 # returns a SpanData for the given dataset                                    
 def get_data_object(dset):
     return SpanData(_span_guesses(dset))
+    
 
 # Accepts volumes as strings since we store them that way.
 # Returns the dependancy found (if any) as a list of integers if all coefficents are <= maxcoeff or maxcoeff is nonpositive;

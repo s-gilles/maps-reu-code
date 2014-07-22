@@ -379,7 +379,7 @@ def _sigusr1_handler(sig, frame):
 
 def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12,
                      install_signal_handlers = True, is_appending = False, snap_path=SNAP_PATH, csv_separator = ';'):
-    """Call this, given a batch iterator, to exhaust that batch iterator and
+    """Call this, given a manifold iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
   beginCollection(BatchIterator(TorusBundleIterator), 50)
@@ -419,6 +419,7 @@ Optional parameters:
     global _snap_process
 
     pari.set_real_precision(100)
+    iterator = BatchIterator(iterator,100*thread_num)
 
     # Fiddle about with waiting for workers to startup
     print('Initializing...')

@@ -7,7 +7,9 @@ _EPSILON = 1e-12
 gen.pari.set_real_precision(100)
 
 def find_span(elts, n, cutoff = 4096):
-    """Where elts is a list [a1, a2, a3, ... ], and each ai is a (pari object, name) returns (s, sn, r), where s is determined to be the optimal span that is a subset of elts for an n-dimensional lattice, sn is the corresponding names for s, and r is the ratio of det(S) / d, with S the matrix formed out of s, and d the gcd of all possible such determinants.  It follows that s is a basis for elts iff r is 1.
+    """Parameters: elts is a list [a1, a2, a3, ... ], where each ai is a (volume (as pari object), name)
+
+Returns: returns (s, sn, r), where s is determined to be the optimal span that is a subset of elts for an n-dimensional lattice, sn is the corresponding names for s, and r is the ratio of det(S) / d, with S the matrix formed out of s, and d the gcd of all possible such determinants.  It follows that s is a basis for elts iff r is 1.
 
 Optionally, the parameter cutoff may be passed (defaulting to 4096). This controls the upper bound on absolute values of coefficients resulting from pari's lindep that are considered relevant.  For example [sqrt(2), 0.00001] gives a linear dependence of [-160, 22627417]. In practice, this should probably be ignored."""
 

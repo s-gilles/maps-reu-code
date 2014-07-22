@@ -21,7 +21,7 @@ import traceback
 
 # `configuration' variables between runs/machines
 CENSUS_CHUNK_SIZE = 50
-SNAP_PATH='/usr/local/bin/snap'
+SNAP_PATH='snap'
 TRIG_PATH='./triangulations/linkexteriors'
 
 SIG_FINISH = 1
@@ -44,7 +44,7 @@ SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degen
 pari.set_real_precision(100)
 
 # Paired with snap process creation to prevent signal propagation
-def preexec_discard_signals():
+def _preexec_discard_signals():
     os.setpgrp()
 
 # Each snap process is managed by one python thread.
@@ -75,7 +75,7 @@ _full_list_lock = threading.Lock()
 _discriminants = dict()
 _discriminants_lock = threading.Lock()
 
-def write_dict_to_output(output_filename = 'output.csv',  first_time = True, separator = ';'):
+def _write_dict_to_output(output_filename = 'output.csv',  first_time = True, separator = ';'):
     global _full_list, _full_list_lock
     with _full_list_lock:
         if first_time:
@@ -142,7 +142,7 @@ def write_dict_to_output(output_filename = 'output.csv',  first_time = True, sep
         _full_list = dict()
         f.close()
 
-def drain(out):
+def _drain(out):
     result = ''
     incremental = ''
     while True:
@@ -159,44 +159,44 @@ def drain(out):
 # all, this method will not return in a timely fashion. Therefore, all threads
 # should perform
 #
-#     _snap_process[my_unique_thread_id] = kickoff_snap()
+#     _snap_process[my_unique_thread_id] = _kickoff_snap()
 #
 # as their first action. After a suitable waiting period (say 0.1s), those
 # threads corresponding to id's for which _snap_process[id] is None are
 # definitely hung, and may be restarted
-def kickoff_snap(temp_file_dir):
-    cprocess = subprocess.Popen([SNAP_PATH],
+def _kickoff_snap(temp_file_dir, snap_path = SNAP_PATH):
+    cprocess = subprocess.Popen([snap_path],
                                 bufsize = 1,
                                 shell = False,
                                 stdin = subprocess.PIPE,
                                 stdout = subprocess.PIPE,
                                 stderr = subprocess.STDOUT,
-                                preexec_fn = preexec_discard_signals)
+                                preexec_fn = _preexec_discard_signals)
 
     fcntl.fcntl(cprocess.stdout, fcntl.F_SETFL,
                 fcntl.fcntl(cprocess.stdout, fcntl.F_GETFL) | os.O_NONBLOCK)
 
-    drain(cprocess.stdout)
+    _drain(cprocess.stdout)
 
     # No output is expected after these
-    send_cmd(cprocess, 'set precision 10\n')
-    send_cmd(cprocess, 'set digits_printed 100 f\n')
-    send_cmd(cprocess, 'set degree 8\n')
-    send_cmd(cprocess, 'set simplify false\n')
-    send_cmd(cprocess, 'set path ' + temp_file_dir + '\n')
+    _send_cmd(cprocess, 'set precision 10\n')
+    _send_cmd(cprocess, 'set digits_printed 100 f\n')
+    _send_cmd(cprocess, 'set degree 8\n')
+    _send_cmd(cprocess, 'set simplify false\n')
+    _send_cmd(cprocess, 'set path ' + temp_file_dir + '\n')
     return cprocess
 
 # Emulates typing string into a terminal running process. Note that since snap
 # displays a prompt, entering '\n' causes snap's stdout to immediately echo the
 # prompt plus string. This must be eaten, otherwise the process will hang.
-def send_cmd(process, string):
+def _send_cmd(process, string):
     process.stdin.write((string + '\n').encode(encoding = 'UTF-8'))
     process.stdin.flush()
-    return drain(process.stdout)
+    return _drain(process.stdout)
 
 # Merge a dictionary to _full_list. This should be called in turn by each worker
 # thread once the list of manifolds to analyze has been exhausted
-def merge_up_dict(local_dict):
+def _merge_up_dict(local_dict):
     with _full_list_lock:
         for polynomial_str, local_polydict in local_dict.items():
             fulls_polydict = _full_list.setdefault(polynomial_str, dict())
@@ -206,7 +206,7 @@ def merge_up_dict(local_dict):
 
 # The action that a worker thread takes.  Simply read from the Queue and
 # perform computations.
-def compute_shape_fields(idx, temp_file_dir):
+def _compute_shape_fields(idx, temp_file_dir):
     global SIG_FINISH, SIG_DIE, SIG_MERGE
     global _snap_process
     global _worker_to_main_messages
@@ -224,14 +224,14 @@ def compute_shape_fields(idx, temp_file_dir):
         manifold, sig = _ready_manifolds.get()
 
         if sig is SIG_FINISH:
-            merge_up_dict(local_dict)
+            _merge_up_dict(local_dict)
             _ready_manifolds.task_done()
             break
         elif sig is SIG_DIE:
             _ready_manifolds.task_done()
             break
         elif sig is SIG_MERGE:
-            merge_up_dict(local_dict)
+            _merge_up_dict(local_dict)
             local_dict = dict()
             _ready_manifolds.task_done()
             _worker_to_main_messages.put((SIG_MERGE,))
@@ -253,15 +253,15 @@ def compute_shape_fields(idx, temp_file_dir):
         manifold.save(full_fname)
         while True:
             try:
-                send_cmd(_snap_process[idx], 'read file ' + fname)
+                _send_cmd(_snap_process[idx], 'read file ' + fname)
                 if _snap_process[idx].poll() is not None:
                     raise IOError
 
-                snap_output = send_cmd(_snap_process[idx], 'compute invariant_trace_field')
+                snap_output = _send_cmd(_snap_process[idx], 'compute invariant_trace_field')
                 if _snap_process[idx].poll() is not None:
                     raise IOError
 
-                # due to O_NONBLOCK and drain(), IOError doesn't show up until
+                # due to O_NONBLOCK and _drain(), IOError doesn't show up until
                 # the call AFTER the killer
                 break
             except IOError:
@@ -270,12 +270,12 @@ def compute_shape_fields(idx, temp_file_dir):
                     _snap_process[idx].terminate()
                 except:
                     pass
-                _snap_process[idx] = kickoff_snap(temp_file_dir)
+                _snap_process[idx] = _kickoff_snap(temp_file_dir, snap_path=snap_path)
                 continue
 
         times_retried = 0
         while True:
-            snap_output = snap_output + drain(_snap_process[idx].stdout)
+            snap_output = snap_output + _drain(_snap_process[idx].stdout)
             if RE_INV_TRACE_FIELD_NOT_FOUND.match(snap_output):
                 break
             elif RE_FUNC_REQ_GROUP.match(snap_output):
@@ -288,7 +288,7 @@ def compute_shape_fields(idx, temp_file_dir):
                     pass
                 while True:
                     try:
-                        _snap_process[idx] = kickoff_snap(temp_file_dir)
+                        _snap_process[idx] = _kickoff_snap(temp_file_dir, snap_path=snap_path)
                         break
                     except Exception as e:
                         print(str(idx) + ' attempting to recover [' + str(e) + '] ...')
@@ -319,7 +319,7 @@ def compute_shape_fields(idx, temp_file_dir):
                 break
             time.sleep(0.5)
             try:
-                snap_output = snap_output + send_cmd(_snap_process[idx], '')
+                snap_output = snap_output + _send_cmd(_snap_process[idx], '')
             except IOError:
                 # Force the next RE_ERROR.match to trigger
                 snap_output = 'Error'
@@ -335,34 +335,34 @@ def compute_shape_fields(idx, temp_file_dir):
 
 
     if _snap_process[idx] is not None:
-        send_cmd(_snap_process[idx], 'quit')
+        _send_cmd(_snap_process[idx], 'quit')
     _snap_process[idx] = None
 
     return
 
-# Wrapper around compute_shape_fields, in case any one-time startup/shutdown
+# Wrapper around _compute_shape_fields, in case any one-time startup/shutdown
 # code needs to be applied.
-def worker_action(idx, temp_file_dir= '/tmp/'):
-    _snap_process[idx] = kickoff_snap(temp_file_dir)
-    compute_shape_fields(idx, temp_file_dir)
+def _worker_action(idx, temp_file_dir= '/tmp/', snap_path=SNAP_PATH):
+    _snap_process[idx] = _kickoff_snap(temp_file_dir,snap_path=snap_path)
+    _compute_shape_fields(idx, temp_file_dir)
     return
 
-def double_sigint_handler(signum, frame):
+def _double__sigint_handler(signum, frame):
     print()
     sys.exit(0)
 
-def sigint_handler(signum, frame):
+def _sigint_handler(signum, frame):
     global main_action
     main_action = ACT_COLLECT_THEN_DIE
     print('\nDying. Please wait for worker threads to terminate. (^C again REALLY kills)')
-    signal.signal(signal.SIGINT, double_sigint_handler)
+    signal.signal(signal.SIGINT, _double__sigint_handler)
 
-def sigusr2_handler(sig, frame):
+def _sigusr2_handler(sig, frame):
     global main_action
     main_action = ACT_COLLECT
     print('Writing out current progress. Please wait.')
 
-def sigusr1_handler(sig, frame):
+def _sigusr1_handler(sig, frame):
     id2name = dict([(th.ident, th.name) for th in threading.enumerate()])
     code = []
     for threadId, stack in sys._current_frames().items():
@@ -378,8 +378,8 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_locals)
 
 def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12,
-                     install_signal_handlers = True, is_appending = False, csv_separator = ';'):
-    """Call this, given a batch iterator, to exhaust that batch iterator and
+                     install_signal_handlers = True, is_appending = False, snap_path=SNAP_PATH, csv_separator = ';'):
+    """Call this, given a manifold iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
   beginCollection(BatchIterator(TorusBundleIterator), 50)
@@ -400,6 +400,8 @@ Optional parameters:
 
   is_appending (default = False).  If set to True, the program will assume that output_filename already contains the results of some previous run, and will not overwrite them.  If set to False (the default!), the program will completely overwrite output_filename with its own results.
 
+  snap_path (default = SNAP_PATH). Tells the program where snap's executable resides. The default should usually work fine.
+
   csv_separator (default = ';').  Specifies the separator used in writing out csv files."""
     global CENSUS_CHUNK_SIZE
     global SNAP_PATH
@@ -417,6 +419,7 @@ Optional parameters:
     global _snap_process
 
     pari.set_real_precision(100)
+    iterator = BatchIterator(iterator,100*thread_num)
 
     # Fiddle about with waiting for workers to startup
     print('Initializing...')
@@ -426,7 +429,7 @@ Optional parameters:
         _snap_process.append(None)
 
     for i in range(0, thread_num):
-        new_thread = threading.Thread(group = None, target = worker_action, args = (i,))
+        new_thread = threading.Thread(group = None, target = _worker_action, args = (i,), kwargs = {'snap_path':snap_path})
         new_thread.daemon = True
         new_thread.start()
         while _snap_process[i] is None:
@@ -441,9 +444,9 @@ Optional parameters:
     #
     # or such.
     if install_signal_handlers:
-        signal.signal(signal.SIGINT, sigint_handler)
-        signal.signal(signal.SIGUSR1, sigusr1_handler)
-        signal.signal(signal.SIGUSR2, sigusr2_handler)
+        signal.signal(signal.SIGINT, _sigint_handler)
+        signal.signal(signal.SIGUSR1, _sigusr1_handler)
+        signal.signal(signal.SIGUSR2, _sigusr2_handler)
 
     print('Working...')
 
@@ -463,7 +466,7 @@ Optional parameters:
                 _ready_manifolds.put((None, SIG_MERGE))
             for i in range(0, thread_num):
                 _worker_to_main_messages.get()
-            write_dict_to_output(output_filename, first_time = not have_written_out_already,
+            _write_dict_to_output(output_filename, first_time = not have_written_out_already,
                                  separator = csv_separator)
             have_written_out_already = True
             print('Wrote out current progress.')
@@ -497,5 +500,5 @@ Optional parameters:
     while any(w.is_alive() for w in worker_threads):
         time.sleep(0.05)
 
-    write_dict_to_output(output_filename, first_time = not have_written_out_already,
+    _write_dict_to_output(output_filename, first_time = not have_written_out_already,
                          separator = csv_separator)

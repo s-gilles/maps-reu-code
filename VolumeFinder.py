@@ -21,7 +21,7 @@ import traceback
 
 # `configuration' variables between runs/machines
 CENSUS_CHUNK_SIZE = 50
-SNAP_PATH='/usr/local/bin/snap'
+SNAP_PATH='snap'
 TRIG_PATH='./triangulations/linkexteriors'
 
 SIG_FINISH = 1
@@ -164,8 +164,8 @@ def drain(out):
 # as their first action. After a suitable waiting period (say 0.1s), those
 # threads corresponding to id's for which _snap_process[id] is None are
 # definitely hung, and may be restarted
-def kickoff_snap(temp_file_dir):
-    cprocess = subprocess.Popen([SNAP_PATH],
+def kickoff_snap(temp_file_dir, snap_path = SNAP_PATH):
+    cprocess = subprocess.Popen([snap_path],
                                 bufsize = 1,
                                 shell = False,
                                 stdin = subprocess.PIPE,
@@ -270,7 +270,7 @@ def compute_shape_fields(idx, temp_file_dir):
                     _snap_process[idx].terminate()
                 except:
                     pass
-                _snap_process[idx] = kickoff_snap(temp_file_dir)
+                _snap_process[idx] = kickoff_snap(temp_file_dir, snap_path=snap_path)
                 continue
 
         times_retried = 0
@@ -288,7 +288,7 @@ def compute_shape_fields(idx, temp_file_dir):
                     pass
                 while True:
                     try:
-                        _snap_process[idx] = kickoff_snap(temp_file_dir)
+                        _snap_process[idx] = kickoff_snap(temp_file_dir, snap_path=snap_path)
                         break
                     except Exception as e:
                         print(str(idx) + ' attempting to recover [' + str(e) + '] ...')
@@ -342,8 +342,8 @@ def compute_shape_fields(idx, temp_file_dir):
 
 # Wrapper around compute_shape_fields, in case any one-time startup/shutdown
 # code needs to be applied.
-def worker_action(idx, temp_file_dir= '/tmp/'):
-    _snap_process[idx] = kickoff_snap(temp_file_dir)
+def worker_action(idx, temp_file_dir= '/tmp/', snap_path=SNAP_PATH):
+    _snap_process[idx] = kickoff_snap(temp_file_dir,snap_path=snap_path)
     compute_shape_fields(idx, temp_file_dir)
     return
 
@@ -378,7 +378,7 @@ def sigusr1_handler(sig, frame):
     d.update(frame.f_locals)
 
 def begin_collection(iterator, output_filename = 'output.csv', thread_num = 12,
-                     install_signal_handlers = True, is_appending = False, csv_separator = ';'):
+                     install_signal_handlers = True, is_appending = False, snap_path=SNAP_PATH, csv_separator = ';'):
     """Call this, given a batch iterator, to exhaust that batch iterator and
 store the result to output_filename.  Example:
 
@@ -426,7 +426,7 @@ Optional parameters:
         _snap_process.append(None)
 
     for i in range(0, thread_num):
-        new_thread = threading.Thread(group = None, target = worker_action, args = (i,))
+        new_thread = threading.Thread(group = None, target = worker_action, args = (i,), kwargs = {'snap_path':snap_path})
         new_thread.daemon = True
         new_thread.start()
         while _snap_process[i] is None:

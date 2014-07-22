@@ -795,7 +795,7 @@ class SpanData:
                                 if n != 0 and -1*ldp[n] > 0:  # don't add a plus sign for the first term
                                     comb += '+'
                                 if ldp[n] != 0:
-                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[2][n]
+                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[1][n]
                             f.write('"'+m+'"'+seperator)
                             f.write('"'+itf+'"'+seperator)
                             f.write('"'+r+'"'+seperator)

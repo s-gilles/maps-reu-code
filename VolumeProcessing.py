@@ -801,6 +801,13 @@ class SpanData:
                             f.write('"'+r+'"'+seperator)
                             f.write('"'+v+'"'+seperator)
                             f.write('"'+comb+'"\n')
+            for p in self.fit_fails.keys():
+                for rec in self.fit_fails[p]:
+                    f.write('"'+str(rec[1])+'"'+seperator)
+                    f.write('"'+str(p)+'"'+seperator)
+                    f.write('"'+'TraceField'+'"'+seperator)
+                    f.write('"'+str(rec[0])+'"'+seperator)
+                    f.write('"'+'None'+'"\n')
         finally:
             if type(outfile) == str:
                 f.close()

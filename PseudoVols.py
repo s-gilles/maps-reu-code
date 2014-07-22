@@ -218,11 +218,10 @@ class VolumeData:
                     del self.data[p][v]
 
     # Runs several methods for decreasing size without losing much information
-    # Will remove manifolds if all their pvols were integral multiples of other pvols
+    # Will no longer remove manifolds if all their pvols were integral multiples of other pvols
     def clean(self, maxsfdegree=MAX_ITF, epsilon = EPSILON):
         self.filter_fields(maxsfdegree)
         self.remove_nonpositive_vols(epsilon = epsilon)
-        self.cull_volumes(epsilon = epsilon)
 
     # Cut down to 1 manifold per poly,vol pair.
     def remove_duplicate_manifolds(self):

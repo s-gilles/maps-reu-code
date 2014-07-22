@@ -197,7 +197,7 @@ class Dataset:
         discarded have their names stored, and can be retrieved by
         get_pared_volumes()
         """
-        mdata = self..get_manifold_data(poly,root,vol)
+        mdata = self.get_manifold_data(poly,root,vol)
         mpared = self.get_pared_manifolds(poly,root,vol)
         while len(mdata) > 1:
             mpared.append(mdata.pop(1)[0])
@@ -235,7 +235,7 @@ class Dataset:
                         # j is effectivley incremented, no need to do it
                     else:
                         j += 1
-                    except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
+                except (ValueError, ZeroDivisionError): # bad quotient; not a linear combination either way so...
                     j += 1
             i += 1
 
@@ -366,7 +366,7 @@ class Dataset:
                 opt = (nm,len(nm))
         return opt[0]
 
-    def smush_volumes(self, epsilon = EPSILON)
+    def smush_volumes(self, epsilon = EPSILON):
         """
         If some volumes differ by less than epsilon, combine them,
         keeping one of them arbitrarily.
@@ -379,7 +379,7 @@ class Dataset:
 
         Note: This method is supreceded by cull_all_volumes(), and has
         only been briefly tested.
-        """:
+        """
         d = self.copy()
         balls = list()
         for p in d.get_polys():
@@ -412,9 +412,17 @@ class Dataset:
                     vol_data[v] = nrec  # bit of an abuse of v
         return d
 
-    # Given a valid Manifold object or manifold name, returns whatever we have on it
-    # Form: [InvariantTraceField,Root,Volume,SolutionType,GeomAlternative,NiceAlternative] or None if it couldn't be found
     def search_for_manifold(self,man):
+        """
+        Given a valid Manifold object (or a valid Manifold name, return
+        information on it.
+
+        Returned data is of the form [InvariantTraceField, Root, Volume,
+        SolutionType, GeomAlternative, NiceAlternative]
+
+        Where all elements are strings.  Note that GeomAlternative and
+        NiceAlternative may very well be the same manifold.
+        """
         man = str(man)
         for p in self.get_polys():
             for r in self.get_roots(p):
@@ -459,10 +467,26 @@ def _niceness(nm):
     else:
         n += 10
     # n *= gap TODO
-    # apply dehn penalties TODO
+
+    # Dehn surgery penalties:
+    in_dehn_fill = 0
+    for l in nm[1:]:
+        if l == '(':
+            in_dehn_fill = 1
+        elif l == ')':
+            in_dehn_fill = 0
+        elif l in '123456789' and in_dehn_fill:
+            n += 0.5
+
     return n
 
 def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
+    """
+    Read in a csv (with header) and return a Dataset object representing
+    it.  The csv should be in the form:
+
+    Name;InvariantTraceField;Root;NumberOfComplexPlaces;Volume;InvariantTraceFieldDegree;SolutionType;Disc;DiscFactors;Tetrahedra
+    """
     try:
         f = open(filenm,'r')
         f.readline()
@@ -474,9 +498,14 @@ def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
             f.close()
         raise
 
-
 # combines two output files from this program
 def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
+    """
+    Given a list of filenames and file separators for each file, combine
+    the volumes of each file into one output.  The result is similar to
+    `cat`, in addition to handling the headers and conversions of
+    separators, if desired.
+    """
     dsets = list()
     for i in xrange(len(filenms)):
         inf = open(filenms[i],'r')
@@ -493,8 +522,12 @@ def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_
         ouf = open(out_filenm, 'w')
     write_csv(ouf, dsets[0], seperator = out_seperator, append = out_append)
 
-# read in raw csv in_file, pare and cull it, write it to out_file
 def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):
+    """
+    A convenience method to do the following: Read from the input
+    filename, pare and cull the resulting dataset, then write it out ot
+    the output filename.
+    """
     inf = open(in_filenm,'r')
     try:
         inf.readline()  # skip header
@@ -512,9 +545,11 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
     finally:
         ouf.close()
 
-# Load a CSV file organized by manifold and reorganize it by polynomial and volume.
-# The result: dict poly ---> (dict roots ----> (dict vols ---> (list (manifold name, tetrahedra, soltype), list (pared manifolds)), degree etc.)
 def read_raw_csv_from_file(in_file, seperator = ';'):
+    """
+    Read raw csv data in.  A header is not expected.  The file should be
+    in the same format as expected by 
+    """
     return read_raw_csv(in_file.readlines(), seperator)
 
 # Returns true if the given strings are equal or complex conjugates as formatted by snap: a+b*I, a-b*I

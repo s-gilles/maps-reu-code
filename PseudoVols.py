@@ -182,9 +182,9 @@ It's usually not nescecary to make these yourself; collection and read methods r
             if type(output_file) == str and f:
                 f.close()
 
-    # This filter removes some polynomials with no subfields of degree <= maxsfdegree
-    # it doesn't get them all, but does avoid calling nfsubfields; it is quick and approximate.
     def filter_fields(self, maxsfdegree=MAX_ITF):
+        """This filter removes some polynomials with no subfields of degree <= maxsfdegree
+        it doesn't get them all, but does avoid calling nfsubfields; it is quick and approximate."""
         def _filter(p): # for a double break
             deg = pari(p).poldegree()
             for n in xrange(maxsfdegree):
@@ -222,22 +222,24 @@ It's usually not nescecary to make these yourself; collection and read methods r
                         j += 1
                 i += 1
 
-    # Removes any volume less than epsilon
     def remove_nonpositive_vols(self, epsilon = EPSILON):
+        """Removes any volume less than epsilon"""
         for p in self.get_polys():
             for v in self.get_volumes(p):
                 try:
                     if float(v) < epsilon:
-                        print str(v)+'was less than '+str(epsilon)  # DEBUG
+                        print str(v)+'was less than '+str(epsilon)
                         del self.data[p][v]
-                except ValueError as e:  # v was really close to 0  # DEBUG as
+                except: # v was really close to 0
                     del self.data[p][v]
-                    print str(v)+'threw a value error: '+str(e)     # DEBUG
+                    print str(v)+'threw a value error: '+str(e)
 
-    # Runs several methods for decreasing size without losing much information
-    # Will no longer remove manifolds if all their pvols were integral multiples of other pvols
+    
     def clean(self, maxsfdegree=MAX_ITF, epsilon = EPSILON):
-        self.filter_fields(maxsfdegree)
+        """Runs several methods for decreasing size without losing much information
+        Set maxsfdegree to None to avoid culling based on subfield degree."""
+        if maxsfdegree:
+            self.filter_fields(maxsfdegree)
         self.remove_nonpositive_vols(epsilon = epsilon)
 
     # Cut down to 1 manifold per poly,vol pair.
@@ -249,8 +251,8 @@ It's usually not nescecary to make these yourself; collection and read methods r
 def is_int(fl, epsilon = EPSILON):
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
-# given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it
 def read_volumedata_csv(infile, seperator = ';'):
+    """Given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it."""
     try:
         if type(infile) ==  str:
             f = open(infile,'r')

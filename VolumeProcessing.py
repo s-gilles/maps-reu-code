@@ -1135,7 +1135,7 @@ class SpanData:
                     try:
                         f.write('"'+str(pari(str(p)).polredabs())+'"'+separator)
                     except: # cypari.gen.error or w/e from polredabs failing
-                        f.write('"'+str(p)+'"'+seperator)   # be consistent with get_potential_trace_field fail behaviour
+                        f.write('"'+str(p)+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
                     f.write('"'+'TraceField'+'"'+separator)
                     f.write('"'+str(rec[0])+'"'+separator)
                     f.write('"'+'None'+'"\n')

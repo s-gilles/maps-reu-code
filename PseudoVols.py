@@ -11,7 +11,7 @@ EPSILON = .0000000000001    # same as VolumeProcessing
 MAX_ITF = 8                 # ^
 pari.set_real_precision(100)
 
-def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, seperator = ';'):
+def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, separator = ';'):
     """The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
 except output will be written out every period manifolds and logs generated, instead of all at once."""
 
@@ -32,7 +32,7 @@ except output will be written out every period manifolds and logs generated, ins
             if ctr == period or done:
                 print 'Processing '+str(block[0])+' to '+str(block[-1])+'.' 
                 v = get_volume_data(ForwardingIterator(block.__iter__(),lambda m : str(m)),engine=engine,max_secs=max_secs,retrieve=retrieve)
-                v.write_to_csv(f,append=append,seperator=seperator)
+                v.write_to_csv(f,append=append,separator=separator)
                 append = True  # we must be appending after the first time
                 ctr = 0
                 block = list()
@@ -159,7 +159,7 @@ It's usually not nescecary to make these yourself; collection and read methods r
         return VolumeData(data = new_data)
 
     # given an (open, ready to write) file object or valid filename, writes the data
-    def write_to_csv(self, output_file, seperator = ';', append = False):
+    def write_to_csv(self, output_file, separator = ';', append = False):
         """Writes out the data to output_file, provided output_file is a valid (open, ready to write) File object or filename."""
         try:
             if type(output_file) == str:
@@ -170,13 +170,13 @@ It's usually not nescecary to make these yourself; collection and read methods r
             else:
                 f = output_file
             if not append:
-                f.write('"TraceField"'+seperator+'"Volume"'+seperator+'"Manifold"'+seperator+'"ObstructionClass"'+'\n')
+                f.write('"TraceField"'+separator+'"Volume"'+separator+'"Manifold"'+separator+'"ObstructionClass"'+'\n')
             for p in self.get_polys():
                 for v in self.get_volumes(p):
                     for rec in self.data[p][v]:
-                        f.write('"'+p+'"'+seperator)
-                        f.write('"'+v+'"'+seperator)
-                        f.write('"'+rec[0]+'"'+seperator)
+                        f.write('"'+p+'"'+separator)
+                        f.write('"'+v+'"'+separator)
+                        f.write('"'+rec[0]+'"'+separator)
                         f.write('"'+str(rec[1])+'"\n')
         finally:
             if type(output_file) == str and f:
@@ -251,7 +251,7 @@ It's usually not nescecary to make these yourself; collection and read methods r
 def is_int(fl, epsilon = EPSILON):
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
-def read_volumedata_csv(infile, seperator = ';'):
+def read_volumedata_csv(infile, separator = ';'):
     """Given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it."""
     try:
         if type(infile) ==  str:
@@ -261,7 +261,7 @@ def read_volumedata_csv(infile, seperator = ';'):
             f = infile
         data = dict()
         for l in f.readlines():
-            w = l.strip('\n').replace('"','').split(seperator)
+            w = l.strip('\n').replace('"','').split(separator)
             try:
                 data.setdefault(w[0],dict()).setdefault(w[1],list()).append((w[2],int(w[3])))
             except IndexError:  # This was initially for debugging, but it can be useful if you grabbed a file while a line was being written 

@@ -289,7 +289,7 @@ class Dataset:
             for m in self.get_manifold_data(poly,root,minvol[0]):
                 return (minvol[0],m)
 
-    def quick_write_csv(self, filenm, seperator = ';', sub_seperator = '|', append = False):
+    def quick_write_csv(self, filenm, separator = ';', sub_separator = '|', append = False):
         """
         Write out the Dataset to an output file.  If append is set to
         False, the file, if extant, is overwritten, if not, the file is
@@ -297,7 +297,7 @@ class Dataset:
         """
         try:
             f = open(filenm,'w')
-            write_csv(f, dataset, seperator = seperator, sub_seperator = sub_seperator, append = append)
+            write_csv(f, dataset, separator = separator, sub_separator = sub_separator, append = append)
         except:
             f.close()
             raise
@@ -440,29 +440,29 @@ class Dataset:
                     vol_data[v] = nrec  # bit of an abuse of v
         return d
 
-    def write_spans(self, fname, seperator = ';'):
+    def write_spans(self, fname, separator = ';'):
         """
         Collect the manifolds of this dataset into spanning lattices,
         writing the results out to the file specified by fname.
         """
         s = _span_guesses(self)
         f = open(fname, 'w')
-        f.write('Polynomial' + seperator +
-                'NumberOfComplexPlaces' + seperator +
-                'Root' + seperator +
-                'SpanDimension' + seperator +
-                'VolumeSpan' + seperator +
-                'ManifoldSpan' + seperator +
+        f.write('Polynomial' + separator +
+                'NumberOfComplexPlaces' + separator +
+                'Root' + separator +
+                'SpanDimension' + separator +
+                'VolumeSpan' + separator +
+                'ManifoldSpan' + separator +
                 'FitRatio\n')
         for p,pd in s.items():
             for r,re in pd.items():
                 if str(re[1]) != '0':
-                    f.write('"' + str(p) + '"' + seperator)
-                    f.write('"' + str(d.get_ncp(p)) + '"' + seperator)
-                    f.write('"' + str(r) + '"' + seperator)
-                    f.write('"' + str(len(re[0])) + '"' + seperator)
-                    f.write('"' + str(re[0]) + '"' + seperator)
-                    f.write('"' + str(re[2]) + '"' + seperator)
+                    f.write('"' + str(p) + '"' + separator)
+                    f.write('"' + str(d.get_ncp(p)) + '"' + separator)
+                    f.write('"' + str(r) + '"' + separator)
+                    f.write('"' + str(len(re[0])) + '"' + separator)
+                    f.write('"' + str(re[0]) + '"' + separator)
+                    f.write('"' + str(re[2]) + '"' + separator)
                     f.write('"' + str(re[1]) + '"\n')
         f.close()
 
@@ -534,7 +534,7 @@ def _niceness(nm):
 
     return n
 
-def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
+def quick_read_csv(filenm, separator = ';', sub_separator = '|'):
     """
     Read in a csv (with header) and return a Dataset object representing
     it.  The csv should be in the form exected by read_csv
@@ -542,7 +542,7 @@ def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
     try:
         f = open(filenm,'r')
         f.readline()
-        d = read_csv(f, seperator = seperator, sub_seperator = sub_seperator)
+        d = read_csv(f, separator = separator, sub_separator = sub_separator)
         f.close()
         return d
     except:
@@ -551,7 +551,7 @@ def quick_read_csv(filenm, seperator = ';', sub_seperator = '|'):
         raise
 
 # combines two output files from this program
-def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_append = False):
+def quick_combine_files(filenms, fileseps, out_filenm, out_separator = ';', out_append = False):
     """
     Given a list of filenames and file separators for each file, combine
     the volumes of each file into one output.  The result is similar to
@@ -563,7 +563,7 @@ def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_
         inf = open(filenms[i],'r')
         try:
             inf.readline()  # skip header
-            dsets.append(read_csv(inf, seperator = fileseps[i]))
+            dsets.append(read_csv(inf, separator = fileseps[i]))
         finally:
             inf.close()
     for d in dsets[1:]:
@@ -572,9 +572,9 @@ def quick_combine_files(filenms, fileseps, out_filenm, out_seperator = ';', out_
         ouf = open(out_filenm, 'a')
     else:
         ouf = open(out_filenm, 'w')
-    write_csv(ouf, dsets[0], seperator = out_seperator, append = out_append)
+    write_csv(ouf, dsets[0], separator = out_separator, append = out_append)
 
-def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = ';', out_append = False):
+def quick_preprocess(in_filenm, out_filenm, in_separator = ';', out_separator = ';', out_append = False):
     """
     A convenience method to do the following: Read from the input
     filename, pare and cull the resulting dataset, then write it out ot
@@ -583,7 +583,7 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
     inf = open(in_filenm,'r')
     try:
         inf.readline()  # skip header
-        d = read_raw_csv(inf, seperator = in_seperator)
+        d = read_raw_csv(inf, separator = in_separator)
     finally:
         inf.close()
     pare_all_volumes(d)
@@ -593,16 +593,16 @@ def quick_preprocess(in_filenm, out_filenm, in_seperator = ';', out_seperator = 
     else:
         ouf = open(out_filenm,'w')
     try:
-        write_csv(ouf, d, seperator = out_seperator, append = out_append)
+        write_csv(ouf, d, separator = out_separator, append = out_append)
     finally:
         ouf.close()
 
-def read_raw_csv_from_file(in_file, seperator = ';'):
+def read_raw_csv_from_file(in_file, separator = ';'):
     """
     Read raw csv data in.  A header is not expected.  The file should be
     in the same format as expected by read_csv
     """
-    return read_raw_csv(in_file.readlines(), seperator)
+    return read_raw_csv(in_file.readlines(), separator)
 
 def _up_to_conjugates(z,w):
     """
@@ -627,7 +627,7 @@ def _get_conjs(z):
     """
     return z[:1]+z[1:].replace('+','\xb1').replace('-','\xb1')
 
-def read_raw_csv(contents, seperator = ';'):
+def read_raw_csv(contents, separator = ';'):
     """
     Read in csv of the form
 
@@ -638,10 +638,10 @@ def read_raw_csv(contents, seperator = ';'):
     for l in contents:
         l = l.replace(' ', '')
 
-        if seperator == ',':    # special cased since ',' appears in Dehn surgery
+        if separator == ',':    # special cased since ',' appears in Dehn surgery
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(seperator)
+            w = l.replace('\n','').replace('"','').split(separator)
 
         # Since order got changed (for some unknown reason):
         try:
@@ -672,7 +672,7 @@ def read_raw_csv(contents, seperator = ';'):
             data[w[3]].extend(w[7:10])
     return Dataset(data)
 
-def read_old_csv(in_file, seperator = ';'):
+def read_old_csv(in_file, separator = ';'):
     """
     Reads a CSV produced by write_csv and returns the contents as a
     dataset object.  This variant handles csvs before we swapped column
@@ -680,17 +680,17 @@ def read_old_csv(in_file, seperator = ';'):
     """
     data = dict()
     for l in in_file.readlines():
-        if seperator == ',':    # again special cased
+        if separator == ',':    # again special cased
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(seperator)
+            w = l.replace('\n','').replace('"','').split(separator)
         vol_entry = data.setdefault(w[0],[dict(),w[3]])[0].setdefault(w[1],dict()).setdefault(w[2],[list(),list()])
         vol_entry[0].append((w[7],w[8],w[9]))
         if len(data[w[0]]) == 2:
             data[w[0]].extend(w[4:7])
     return Dataset(data)
 
-def read_csv(in_file, seperator = ';', sub_seperator = '|'):
+def read_csv(in_file, separator = ';', sub_separator = '|'):
     """
     Read in a csv (without header) and return a Dataset object
     representing it.  The csv should be in the following form:
@@ -699,15 +699,15 @@ def read_csv(in_file, seperator = ';', sub_seperator = '|'):
     """
     data = dict()
     for l in in_file.readlines():
-        if seperator == ',':    # again special cased
+        if separator == ',':    # again special cased
             w = re.findall('"([^"]*)"', l)
         else:
-            w = l.replace('\n','').replace('"','').split(seperator)
+            w = l.replace('\n','').replace('"','').split(separator)
         if len(w) == 10:    # pared manifolds weren't supported when this csv was written out
             w.append('')    # acceptable substitute
         vol_entry = data.setdefault(w[1],[dict(),w[5]])[0].setdefault(w[2],dict()).setdefault(w[4],[list(),list()])
         vol_entry[0].append((w[0],w[9],w[6]))
-        vol_entry[1].extend(w[10].split(sub_seperator))
+        vol_entry[1].extend(w[10].split(sub_separator))
         vol_entry[1] = list(set(vol_entry[1]))  # remove duplicates
         if len(data[w[1]]) == 2:
             data[w[1]].extend([w[3],w[7],w[8]])
@@ -715,30 +715,30 @@ def read_csv(in_file, seperator = ';', sub_seperator = '|'):
 
 def _list_str(lst,sep):
     """
-    Returns the list as a string with the given seperator and no
+    Returns the list as a string with the given separator and no
     brackets.
     """
     ret = ''
     for x in lst:
         ret += str(x)+sep
-    return ret[:-1*len(sep)]    # remove extra seperator
+    return ret[:-1*len(sep)]    # remove extra separator
 
-def write_csv(out_file, dataset, seperator = ';', sub_seperator = '|', append=False):
+def write_csv(out_file, dataset, separator = ';', sub_separator = '|', append=False):
     """
     Writes a CSV file containing the mainfolds records as shown
     below. Note that pared manifolds are currently ignored.
     """
     if not append:
-        out_file.write('Name'+seperator+
-                        'InvariantTraceField'+seperator+
-                        'Root'+seperator+
-                        'NumberOfComplexPlaces'+seperator+
-                        'Volume'+seperator+
-                        'InvariantTraceFieldDegree'+seperator+
-                        'SolutionType'+seperator+
-                        'Disc'+seperator+
-                        'Factored'+seperator+
-                        'Tetrahedra'+seperator+
+        out_file.write('Name'+separator+
+                        'InvariantTraceField'+separator+
+                        'Root'+separator+
+                        'NumberOfComplexPlaces'+separator+
+                        'Volume'+separator+
+                        'InvariantTraceFieldDegree'+separator+
+                        'SolutionType'+separator+
+                        'Disc'+separator+
+                        'Factored'+separator+
+                        'Tetrahedra'+separator+
                         'ParedManifolds'+'\n')
     for p in sorted(dataset.get_polys(), key=lambda poly: (int(dataset.get_degree(poly)), poly)):
         for r in dataset.get_roots(p):
@@ -748,17 +748,17 @@ def write_csv(out_file, dataset, seperator = ';', sub_seperator = '|', append=Fa
             fact_disc = dataset.get_factored_disc(p)
             for v in dataset.get_volumes(p,r):
                 for m in dataset.get_manifold_data(p,r,v):
-                    out_file.write('"'+m[0]+'"'+seperator)
-                    out_file.write('"'+p+'"'+seperator)
-                    out_file.write('"'+r+'"'+seperator)
-                    out_file.write('"'+ncp+'"'+seperator)
-                    out_file.write('"'+v+'"'+seperator)
-                    out_file.write('"'+deg+'"'+seperator)
-                    out_file.write('"'+m[2]+'"'+seperator)
-                    out_file.write('"'+disc+'"'+seperator)
-                    out_file.write('"'+fact_disc+'"'+seperator)
-                    out_file.write('"'+m[1]+seperator)
-                    out_file.write('"'+_list_str(dataset.get_pared_manifolds(p,r,v),sub_seperator).replace(' ','')+'"\n')
+                    out_file.write('"'+m[0]+'"'+separator)
+                    out_file.write('"'+p+'"'+separator)
+                    out_file.write('"'+r+'"'+separator)
+                    out_file.write('"'+ncp+'"'+separator)
+                    out_file.write('"'+v+'"'+separator)
+                    out_file.write('"'+deg+'"'+separator)
+                    out_file.write('"'+m[2]+'"'+separator)
+                    out_file.write('"'+disc+'"'+separator)
+                    out_file.write('"'+fact_disc+'"'+separator)
+                    out_file.write('"'+m[1]+separator)
+                    out_file.write('"'+_list_str(dataset.get_pared_manifolds(p,r,v),sub_separator).replace(' ','')+'"\n')
 
 #### For backwards compatability
 def pare_all_volumes(data):
@@ -773,11 +773,11 @@ def cull_all_volumes(data, epsilon = EPSILON):
     """
     data.cull_all_volumes(epsilon)
 
-def quick_write_csv(data, filenm, seperator = ';', sub_seperator = '|', append = False):
+def quick_write_csv(data, filenm, separator = ';', sub_separator = '|', append = False):
     """
     Deprecated.  Use data.quick_write_csv() instead
     """
-    data.quick_write_csv(filenm, seperator, sub_seperator, append)
+    data.quick_write_csv(filenm, separator, sub_separator, append)
 
 def _span_guesses(data):
     spans = dict()
@@ -816,7 +816,7 @@ def is_int(fl, epsilon = EPSILON): #TODO: move into utility methods
     """
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
-def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
+def quick_write_spans(in_filenames, out_filename, out_separator = ';'):
     """
     Compress input filenames
     """
@@ -830,9 +830,9 @@ def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
         fi.close()
     d = read_raw_csv(lines)
     d.remove_non_geometric_elements()
-    d.write_spans(out_filename, seperator = out_seperator)
+    d.write_spans(out_filename, separator = out_separator)
 
-def read_spans(fname, seperator = ';'):
+def read_spans(fname, separator = ';'):
     """
     Read in a span file, of the form
     Polynomial;NumberOfComplexPlaces;Root;SpanDimension;VolumeSpan;ManifoldSpan;FitRatio
@@ -846,7 +846,7 @@ def read_spans(fname, seperator = ';'):
     f.readline()
     spans = dict()
     for l in f.readlines():
-        w = l.replace('"','').replace(' ','').strip('\n').split(seperator)  # whitespace can cause weird problems
+        w = l.replace('"','').replace(' ','').strip('\n').split(separator)  # whitespace can cause weird problems
         for i in [4,5,7,8,9,10]:
             try:
                 w[i] = w[i][2:-2].split("','")    # convert string back to list of strings
@@ -944,7 +944,7 @@ class SpanData:
         """
         return self.nice_fits
 
-    def write_to_csv(self, outfile, dset, seperator = ';', append = False):
+    def write_to_csv(self, outfile, dset, separator = ';', append = False):
         """
         Write these span results out to outfile as a csv.
         """
@@ -957,36 +957,36 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('Polynomial' + seperator + 'NumberOfComplexPlaces' + seperator + 'Root' + seperator + 'SpanDimension' + seperator + 'VolumeSpan' + seperator + 'ManifoldSpan' + seperator + 'FitRatio')
+                f.write('Polynomial' + separator + 'NumberOfComplexPlaces' + separator + 'Root' + separator + 'SpanDimension' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio')
                 if self.fitted:
-                    f.write(seperator + 'SolvedPseudoVolumes' + seperator + 'SolvedNames' + seperator + 'UnsolvedPseudoVolumes' + seperator + 'UnsolvedNames' + seperator + 'PseudoFitRatio')
+                    f.write(separator + 'SolvedPseudoVolumes' + separator + 'SolvedNames' + separator + 'UnsolvedPseudoVolumes' + separator + 'UnsolvedNames' + separator + 'PseudoFitRatio')
                 f.write('\n')
             for p in self.get_polys():
                 for r in self.get_roots(p):
                     re = self.data[p][r]
-                    f.write('"' + str(p) + '"' + seperator)
+                    f.write('"' + str(p) + '"' + separator)
                     try:
-                        f.write('"' + str(dset.get_ncp(p)) + '"' + seperator)
+                        f.write('"' + str(dset.get_ncp(p)) + '"' + separator)
                     except: # don't give up because dset was surprised
-                        f.write('"?"' + seperator)
-                    f.write('"' + str(r) + '"' + seperator)
-                    f.write('"' + str(len(re[0])) + '"' + seperator)
-                    f.write('"' + str(re[0]) + '"' + seperator)
-                    f.write('"' + str(re[2]) + '"' + seperator)
+                        f.write('"?"' + separator)
+                    f.write('"' + str(r) + '"' + separator)
+                    f.write('"' + str(len(re[0])) + '"' + separator)
+                    f.write('"' + str(re[0]) + '"' + separator)
+                    f.write('"' + str(re[2]) + '"' + separator)
                     f.write('"' + str(re[1]) + '"')
                     if self.fitted:
-                        f.write(seperator)
+                        f.write(separator)
                         if len(re) == 6:
-                            f.write('"' + str([t[0] for t in re[3]]) + '"' + seperator)
-                            f.write('"' + str([t[1] for t in re[3]]) + '"' + seperator)
-                            f.write('"' + str([t[0] for t in re[5]]) + '"' + seperator)
-                            f.write('"' + str([t[1] for t in re[5]]) + '"' + seperator)
+                            f.write('"' + str([t[0] for t in re[3]]) + '"' + separator)
+                            f.write('"' + str([t[1] for t in re[3]]) + '"' + separator)
+                            f.write('"' + str([t[0] for t in re[5]]) + '"' + separator)
+                            f.write('"' + str([t[1] for t in re[5]]) + '"' + separator)
                             f.write('"' + str(re[4]) + '"')
                         else:
-                            f.write('"None"' + seperator)
-                            f.write('"None"' + seperator)
-                            f.write('"None"' + seperator)
-                            f.write('"None"' + seperator)
+                            f.write('"None"' + separator)
+                            f.write('"None"' + separator)
+                            f.write('"None"' + separator)
+                            f.write('"None"' + separator)
                             f.write('"1"')
                     f.write('\n')
         finally:
@@ -1065,7 +1065,7 @@ class SpanData:
         """
         return self.fit_fails
 
-    def write_failures(self, outfile, seperator = ';', append = False):
+    def write_failures(self, outfile, separator = ';', append = False):
         """
         Write the fit failures (see get_fit_failures) out to outfile as a csv
         """
@@ -1078,18 +1078,18 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('TraceField' + seperator + 'Volume' + seperator + 'Manifold\n')
+                f.write('TraceField' + separator + 'Volume' + separator + 'Manifold\n')
             for p in self.fit_fails.keys(): # was this working without keys?
                 for rec in self.fit_fails[p]:
-                    f.write('"'+str(p)+'"'+seperator)
-                    f.write('"'+str(rec[0])+'"'+seperator)
+                    f.write('"'+str(p)+'"'+separator)
+                    f.write('"'+str(rec[0])+'"'+separator)
                     f.write('"'+str(rec[1])+'"\n')
         finally:
             if type(outfile) == str:
                 f.close()
 
     
-    def write_nice_fits(self, outfile, seperator = ';', append = False):
+    def write_nice_fits(self, outfile, separator = ';', append = False):
         """
         Writes out the linear combinations producing exotic volumes in a
         relatively readable format as described below.
@@ -1112,7 +1112,7 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('Manifold'+seperator+'InvTraceField'+seperator+'Root'+seperator+'Volume'+seperator+'Combination\n')
+                f.write('Manifold'+separator+'InvTraceField'+separator+'Root'+separator+'Volume'+separator+'Combination\n')
             for m in self.nice_fits.keys():
                 for itf in self.nice_fits[m].keys():
                     for r in self.nice_fits[m][itf].keys():
@@ -1124,17 +1124,17 @@ class SpanData:
                                     comb += '+'
                                 if ldp[n] != 0:
                                     comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[1][n]
-                            f.write('"'+m+'"'+seperator)
-                            f.write('"'+itf+'"'+seperator)
-                            f.write('"'+r+'"'+seperator)
-                            f.write('"'+v+'"'+seperator)
+                            f.write('"'+m+'"'+separator)
+                            f.write('"'+itf+'"'+separator)
+                            f.write('"'+r+'"'+separator)
+                            f.write('"'+v+'"'+separator)
                             f.write('"'+comb+'"\n')
             for p in self.fit_fails.keys():
                 for rec in self.fit_fails[p]:
-                    f.write('"'+str(rec[1])+'"'+seperator)
-                    f.write('"'+str(pari(str(p)).polredabs())+'"'+seperator)
-                    f.write('"'+'TraceField'+'"'+seperator)
-                    f.write('"'+str(rec[0])+'"'+seperator)
+                    f.write('"'+str(rec[1])+'"'+separator)
+                    f.write('"'+str(pari(str(p)).polredabs())+'"'+separator)
+                    f.write('"'+'TraceField'+'"'+separator)
+                    f.write('"'+str(rec[0])+'"'+separator)
                     f.write('"'+'None'+'"\n')
         finally:
             if type(outfile) == str:

@@ -71,17 +71,28 @@ class _SmallIntegerIterator:
     """
     An iterator that returns 1, -1, 2, -2, 3, -3, ...
     """
-    def __init__(self):
+    def __init__(self, max_val = -1):
         self.next_int = 1
+        self.max_val = max_val
+        
+    def __iter__(self):
+        return self
+    
     def next(self):
         last_int = self.next_int
+        
+        if self.max_val > 0 and last_int > self.max_val:
+            raise StopIteration
+        
         if self.next_int > 0:
             self.next_int = -self.next_int
         else:
             self.next_int = -self.next_int + 1
+        return last_int
 
 def reduce_elements(alpha,
-                    elts):
+                    elts,
+                    max_coefficient = -1):
     """
     Given
 
@@ -112,7 +123,7 @@ def reduce_elements(alpha,
     # beta loop if it is determined that Q(gamma) = Q(alpha)
     alpha_degree = 0
     dep_list = [gen.pari(1).Mod(alpha.mod())]
-    for alpha_deg in range(1,alpha.mod().poldegree() + 2):
+    for alpha_degree in range(1,alpha.mod().poldegree() + 2):
         dep_list.insert(0,alpha ** alpha_degree)
         if bool(_matker(gen.pari(dep_list))):
             break
@@ -141,16 +152,12 @@ def reduce_elements(alpha,
         
         n = m * gamma_degree
 
-        print('Have determined [ Q(beta, gamma) : Q ] = ' + str(n) + '\n')
-                    
         # Build { d : d | n, 0 < d < n } for use in testing degrees
         all_factors = _all_factors_of(n)
 
-        print(str(n) + ' and ' + str(all_factors))
-
         # Pick a smallish r 
         r_choice_works = False
-        for r in _SmallIntegerIterator():
+        for r in _SmallIntegerIterator(max_coefficient):
             proposed_gamma = gamma + beta * r
             r_choice_works = True
 
@@ -172,7 +179,7 @@ def reduce_elements(alpha,
             # Make sure [ Q(proposed_gamma, gamma) : Q(gamma) ] >= n
             for f in all_factors:
                 if r_choice_works:
-                    if bool(_matker(all_powers[0:2 * (f + 1)])):
+                    if bool(_matker(powers_of_gamma[0:2 * (f + 1)])):
                         r_choice_works = False
 
             # If the r works, simply update gamma and leave

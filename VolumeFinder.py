@@ -357,11 +357,6 @@ def _sigint_handler(signum, frame):
     print('\nDying. Please wait for worker threads to terminate. (^C again REALLY kills)')
     signal.signal(signal.SIGINT, _double__sigint_handler)
 
-def _sigusr2_handler(sig, frame):
-    global main_action
-    main_action = ACT_COLLECT
-    print('Writing out current progress. Please wait.')
-
 def _sigusr1_handler(sig, frame):
     id2name = dict([(th.ident, th.name) for th in threading.enumerate()])
     code = []

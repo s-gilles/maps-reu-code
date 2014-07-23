@@ -9,7 +9,6 @@ import copy
 # Until this gets globalized
 EPSILON = .0000000000001    # same as VolumeProcessing
 MAX_ITF = 8                 # ^
-pari.set_real_precision(100)
 
 def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, separator = ';'):
     """The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,

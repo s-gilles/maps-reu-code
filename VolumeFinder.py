@@ -389,7 +389,6 @@ Optional parameters:
     SIGINT will attempt to gracefully stop threads, gather their work, and close the program
     SIGINT twice will close the program
     SIGUSR1 will give a stack trace, without otherwise affecting operations
-    SIGUSR2 will write out partial progress (since last write) to output_filename so that it can be inspected. Note thta if this happens, the program will switch to appending mode (see below) to avoid erasing its own results.  This is highly useful.
 
   thread_num (default = 12). Use this many worker threads.  It is recommended to be set to the number of logical cores on the system.
 
@@ -441,7 +440,6 @@ Optional parameters:
     if install_signal_handlers:
         signal.signal(signal.SIGINT, _sigint_handler)
         signal.signal(signal.SIGUSR1, _sigusr1_handler)
-        signal.signal(signal.SIGUSR2, _sigusr2_handler)
 
     print('Working...')
 

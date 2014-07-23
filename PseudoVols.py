@@ -116,7 +116,7 @@ def get_potential_trace_fields(poly):
     """Given a minimal polynomial of a trace field, returns a list of minimal polynomials of the potential invariant trace fields."""
     pol = pari(poly)
     try:
-        return [str(rec[0]) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
+        return [str(rec[0].polredabs()) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
     except: # we want cypari.gen.PariError, but no idea how to reference; fortunately, anything else will just raise again
         pol = pol.polredabs()
         return get_potential_trace_fields(str(pol))

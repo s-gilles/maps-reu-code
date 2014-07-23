@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from cypari import *
 from itertools import product
 from operator import __mul__
@@ -52,7 +54,7 @@ def _degree_over_Q(x):
         dep_list.insert(0, x ** n)
         if bool(_matker(dep_list)):
             return n
-        
+
 def _degree_over_Q_adjoined(x, a):
     """
     The minimal n such that there is a polynomial of degree n in Q(a)
@@ -74,16 +76,16 @@ class _SmallIntegerIterator:
     def __init__(self, max_val = -1):
         self.next_int = 1
         self.max_val = max_val
-        
+
     def __iter__(self):
         return self
-    
+
     def next(self):
         last_int = self.next_int
-        
+
         if self.max_val > 0 and last_int > self.max_val:
             raise StopIteration
-        
+
         if self.next_int > 0:
             self.next_int = -self.next_int
         else:
@@ -97,12 +99,12 @@ def reduce_elements(alpha,
     Given
 
     - alpha, a pari polymod (e.g. Mod(x, x^2 - x - 1))
-        
+
     - elts, a list [b1, b2, ... bn], where each bi is a pari polymod
     element that is itself a polynomial of alpha
 
     computes a gamma such that Q(gamma) is Q(b1, b2, ... bn), and
-    returns 
+    returns
 
     - gamma such that Q(gamma) = Q(b1, b2, ... bn)
 
@@ -127,11 +129,11 @@ def reduce_elements(alpha,
         dep_list.insert(0,alpha ** alpha_degree)
         if bool(_matker(gen.pari(dep_list))):
             break
-        
+
     # Initialize the coefficients [k1, k2, ... kn] for gamma's formal
     # sum
     gamma_coefficients = [0] * len(elts)
-    
+
     gamma = elts[0]
     gamma_degree = _degree_over_Q(gamma)
 
@@ -144,18 +146,24 @@ def reduce_elements(alpha,
     # must be complete, so the loop is short-circuited
     for beta in iter(elts[1:]):
         i += 1
-        
+
+        # If the loop was exhausted and gamma was updated, check if
+        # the degree of gamma is now the degree of alpha. If so, no
+        # futher beta can increase the extension's degree, so return.
+        if gamma_degree >= alpha_degree:
+            break
+
         # [ Q(b, g) : Q ] = [ Q(b, g) : Q(g) ] * [ Q(g) : Q ]
         m = _degree_over_Q_adjoined(beta, gamma)
         if m == 1:
             continue
-        
+
         n = m * gamma_degree
 
         # Build { d : d | n, 0 < d < n } for use in testing degrees
-        all_factors = _all_factors_of(n)
+        all_factors = _all_factors_of(m)
 
-        # Pick a smallish r 
+        # Pick a smallish r
         r_choice_works = False
         for r in _SmallIntegerIterator(max_coefficient):
             proposed_gamma = gamma + beta * r
@@ -165,14 +173,15 @@ def reduce_elements(alpha,
             # _degree_over_Q_adjoined(proposed_gamma, gamma) against m
             # = _degree_over_Q_adjoined(beta, gamma), but since it
             # must be a divisor of m, this is marginally faster.
+
             powers_of_gamma = list()
             powers_of_gamma.append(gen.pari(1).Mod(alpha.mod()))
             powers_of_gamma.append(gamma)
-            for i in range(1, n+1):
+            for i in range(1, m+1):
                 powers_of_gamma.append(proposed_gamma ** i)
                 powers_of_gamma.append(gamma * (proposed_gamma ** i))
 
-            # Make sure [ Q(proposed_gamma, gamma) : Q(gamma) ] <= n
+            # Make sure [ Q(proposed_gamma, gamma) : Q(gamma) ] <= m
             if not bool(_matker(powers_of_gamma)):
                 r_choice_works = False
 
@@ -182,23 +191,22 @@ def reduce_elements(alpha,
                     if bool(_matker(powers_of_gamma[0:2 * (f + 1)])):
                         r_choice_works = False
 
+            # By this point, it should be that
+            # r_choice_works = (_degree_over_Q_adjoined(proposed_gamma, gamma) == m)
+            # which should be equivalent to
+            # r_choice_works = (_degree_over_Q(proposed_gamma) == n)
+
             # If the r works, simply update gamma and leave
             if r_choice_works:
                 gamma = proposed_gamma
                 gamma_degree = n
                 gamma_coefficients[i] = r
                 break
-            
+
         # If the loop was exhausted with no r found, leave - the data
         # was strange
         if not r_choice_works:
             return ValueError
-
-        # If the loop was exhausted and gamma was updated, check if
-        # the degree of gamma is now the degree of alpha. If so, no
-        # futher beta can increase the extension's degree, so return.
-        if gamma_degree >= alpha_degree:
-            break
 
     # Now that gamma is computed, each beta in elts has to be
     # recomputed over gamma instead of alpha. First, minpoly(gamma) is
@@ -217,7 +225,7 @@ def reduce_elements(alpha,
             if bool(dep_results):
                 beta_prime = gen.pari('0').Mod(gamma_minpoly)
                 break
-            
+
         d = 0
         for k in dep_results[0][1:]:
             beta_prime += k * (x_over_gamma ** d)

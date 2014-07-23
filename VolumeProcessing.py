@@ -9,6 +9,7 @@ import fractions
 from numpy.linalg import det
 from SpanFinder import find_span
 from PseudoVols import VolumeData, get_potential_trace_fields
+from VolumeUtilities import *
 from cypari import *
 from fractions import Fraction
 from itertools import combinations
@@ -18,7 +19,6 @@ EPSILON = .0000000000001
 MAX_COEFF = 4096
 MAX_ITF = 8
 SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']   # globalize
-gen.pari.set_real_precision(100)
 
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
@@ -1160,7 +1160,7 @@ def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
 
     num_tries = 0
     while num_tries < max_tries:
-        vec = str(pari(str(vols).replace("\'",'')).lindep())[1:-2].replace(' ','').split(',')
+        vec = str(pari(str(vols).replace("\'",'')).lindep(LINDEP_PRECISION))[1:-2].replace(' ','').split(',')
         num_tries += 1
 
     if not vec or vec == ['']: # no input

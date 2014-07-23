@@ -41,8 +41,6 @@ RE_TRACE_FIELD = re.compile('.*Invariant trace field: ([-+*x0-9^ ]+) \[[0-9]+, *
 
 SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']
 
-pari.set_real_precision(100)
-
 # Paired with snap process creation to prevent signal propagation
 def _preexec_discard_signals():
     os.setpgrp()

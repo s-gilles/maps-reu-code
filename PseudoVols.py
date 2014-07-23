@@ -41,11 +41,16 @@ except output will be written out every period manifolds and logs generated, ins
         f.close()
 
 # Count the number of distinct non-zero (<EPSILON) values up to sign
-def _distinct_abs(vol_list):
-    return len(set([abs(v) for v in vol_list if abs(v) >= EPSILON]))   # remove zero volumes
+def _distinct_abs(vol_list, epsilon = EPSILON):
+    pos = set([abs(pari(v)) for v in vol_list if v >= epsilon])   # remove nonpositive volumes (as distinct is up to sign)
+    good = list()
+    for v in pos:
+        matches = [u for u in good if abs(v-u) <= epsilon]
+        if not matches:
+            good.append(v)
+    return len(good)
 
 def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True, max_itf_degree = MAX_ITF):
-
     """ Returns a VolumeData object containing exotic volumes for manifolds with the given names
 Volumes' precision is based on pari, so set it there
 set retrieve = False to skip retrieving ptolemy data from files
@@ -89,16 +94,9 @@ Set to None and it will be ignored."""
                     print 'No engine and no data retrieved; skipping '+nm
                     continue
             if sols:
-                pairs = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]   # TODO does this flatten do anything?
-                data = list()
-                for p in pairs:
-                    if _distinct_abs(p[1]) <= max_itf_degree/2:
-                        data.append(p)
-                    else:
-                        data.append(None)
-                    # data = [p for p in data if _distinct_abs(p[1]) <= max_itf_degree/2] # arc
+                data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
                 for cl_idx in xrange(len(data)):
-                    if data[cl_idx]:
+                    if data[cl_idx]: # TODO may be trivial since no check here
                         for v in data[cl_idx][1]:
                             recs.setdefault(str(data[cl_idx][0]),dict()).setdefault(str(v),list()).append((nm,cl_idx))
             else:
@@ -128,6 +126,7 @@ def _binmiss(s,l):
     while s < l:
         s *= 2
     return s == l
+    
 
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
@@ -235,12 +234,28 @@ It's usually not nescecary to make these yourself; collection and read methods r
                 except: # v was really close to 0
                     del self.data[p][v]
 
-    
-    def clean(self, maxsfdegree=MAX_ITF, epsilon = EPSILON):
+    def filter_distinct_volumes(self, maxsfdegree = MAX_ITF, epsilon = EPSILON):
+        """Removes an obstruction class if there are more than floor(maxsfdegree/2) distinct (up to sign) nonzero volumes.
+        If this condition is met, it means that the invariant trace fields have more than maxsfdegree,
+        because they have more complex places than that degree could possibly have."""
+        # This sucks, because we have to get everything by manifold,oc pairs again. 
+        classes = dict() # (m,oc):[(poly,vol)]
+        ncp = maxsfdegree/2
+        for p in self.get_polys():  
+            for v in self.get_volumes(p):
+                for rec in self.data[p][v]:
+                    classes.setdefault(rec,list()).append((p,v))
+        for rec,l in classes.items():
+            if _distinct_abs([p[1] for p in l], epsilon = epsilon) > ncp:    # too many distinct volumes
+                for p,v in classes[rec]:
+                    self.data[p][v].remove(rec)
+
+    def clean(self, maxsfdegree = MAX_ITF, epsilon = EPSILON):
         """Runs several methods for decreasing size without losing much information
         Set maxsfdegree to None to avoid culling based on subfield degree."""
         if maxsfdegree:
-            self.filter_fields(maxsfdegree)
+            self.filter_fields(maxsfdegree = maxsfdegree)
+            self.filter_distinct_volumes(maxsfdegree = maxsfdegree, epsilon = epsilon)
         self.remove_nonpositive_vols(epsilon = epsilon)
 
     # Cut down to 1 manifold per poly,vol pair.

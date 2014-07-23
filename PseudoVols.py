@@ -118,7 +118,11 @@ def get_potential_trace_fields(poly):
     try:
         return [str(rec[0].polredabs()) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
     except: # we want cypari.gen.PariError, but no idea how to reference; fortunately, anything else will just raise again
-        pol = pol.polredabs()
+        try:
+            pol = pol.polredabs()
+        except: # actually except PariError again
+            print 'When running trace field '+poly+' polredabs couldn\'t handle it.'
+            return [poly]   # between this return and the above print statement, we should know when the above error happened.
         return get_potential_trace_fields(str(pol))
 
 def _binmiss(s,l):

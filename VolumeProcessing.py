@@ -440,6 +440,32 @@ class Dataset:
                     vol_data[v] = nrec  # bit of an abuse of v
         return d
 
+    def write_spans(self, fname, seperator = ';'):
+        """
+        Collect the manifolds of this dataset into spanning lattices,
+        writing the results out to the file specified by fname.
+        """
+        s = _span_guesses(self)
+        f = open(fname, 'w')
+        f.write('Polynomial' + seperator +
+                'NumberOfComplexPlaces' + seperator +
+                'Root' + seperator +
+                'SpanDimension' + seperator +
+                'VolumeSpan' + seperator +
+                'ManifoldSpan' + seperator +
+                'FitRatio\n')
+        for p,pd in s.items():
+            for r,re in pd.items():
+                if str(re[1]) != '0':
+                    f.write('"' + str(p) + '"' + seperator)
+                    f.write('"' + str(d.get_ncp(p)) + '"' + seperator)
+                    f.write('"' + str(r) + '"' + seperator)
+                    f.write('"' + str(len(re[0])) + '"' + seperator)
+                    f.write('"' + str(re[0]) + '"' + seperator)
+                    f.write('"' + str(re[2]) + '"' + seperator)
+                    f.write('"' + str(re[1]) + '"\n')
+        f.close()
+
     def search_for_manifold(self,man):
         """
         Given a valid Manifold object (or a valid Manifold name, return
@@ -697,9 +723,11 @@ def _list_str(lst,sep):
         ret += str(x)+sep
     return ret[:-1*len(sep)]    # remove extra seperator
 
-# Writes a CSV file containing the mainfolds records as shown below.
-# Note that pared manifolds are currently ignored.
 def write_csv(out_file, dataset, seperator = ';', sub_seperator = '|', append=False):
+    """
+    Writes a CSV file containing the mainfolds records as shown
+    below. Note that pared manifolds are currently ignored.
+    """
     if not append:
         out_file.write('Name'+seperator+
                         'InvariantTraceField'+seperator+
@@ -782,10 +810,16 @@ def _span_guesses(data):
             pass
     return spans
 
-def is_int(fl, epsilon = EPSILON):
+def is_int(fl, epsilon = EPSILON): #TODO: move into utility methods
+    """
+    Return true if the floating point part of fl is within epsilon of 0.
+    """
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
 def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
+    """
+    Compress input filenames
+    """
     if type(in_filenames) is str: # support laziness
         in_filenames = [in_filenames]
     lines = []
@@ -796,9 +830,18 @@ def quick_write_spans(in_filenames, out_filename, out_seperator = ';'):
         fi.close()
     d = read_raw_csv(lines)
     d.remove_non_geometric_elements()
-    write_spans(out_filename, d, seperator = out_seperator)
+    d.write_spans(out_filename, seperator = out_seperator)
 
 def read_spans(fname, seperator = ';'):
+    """
+    Read in a span file, of the form
+    Polynomial;NumberOfComplexPlaces;Root;SpanDimension;VolumeSpan;ManifoldSpan;FitRatio
+
+    Returns a dictionary object (certainly NOT a Dataset) such that they
+    keys are polynomials, and the values are dictionaries. These
+    dictionaries have keys of roots and the values are [SpanDimension,
+    VolumeSpan, ManifoldSpan, FitRatio.
+    """
     f = open(fname,'r')
     f.readline()
     spans = dict()
@@ -812,23 +855,6 @@ def read_spans(fname, seperator = ';'):
         spans.setdefault(w[0],dict())[w[2]] = w[4:]
     return spans
 
-def write_spans(fname, dataset, seperator = ';'):
-    d = dataset # lazy
-    s = _span_guesses(d)
-    f = open(fname, 'w')
-    f.write('Polynomial' + seperator + 'NumberOfComplexPlaces' + seperator + 'Root' + seperator + 'SpanDimension' + seperator + 'VolumeSpan' + seperator + 'ManifoldSpan' + seperator + 'FitRatio\n')
-    for p,pd in s.items():
-        for r,re in pd.items():
-            if str(re[1]) != '0':
-                f.write('"' + str(p) + '"' + seperator)
-                f.write('"' + str(d.get_ncp(p)) + '"' + seperator)
-                f.write('"' + str(r) + '"' + seperator)
-                f.write('"' + str(len(re[0])) + '"' + seperator)
-                f.write('"' + str(re[0]) + '"' + seperator)
-                f.write('"' + str(re[2]) + '"' + seperator)
-                f.write('"' + str(re[1]) + '"\n')
-    f.close()
-
 # Manages interfacing with a dictionary containing the spans.
 # There are two possible forms:
 # poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
@@ -837,7 +863,22 @@ def write_spans(fname, dataset, seperator = ';'):
 # Doing so produces a VolumeData of those pseudovols we just couldn't fit, which can be written out as usual
 # Also, this seems prone (for some reason) to causing stack overflows in PARI
 class SpanData:
+    """
+    Manages interfacing with a dictionary containing the spans.  There are
+    two possible forms:
 
+    poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
+    
+    poly : root : [[spanning_vols], fit_ratio, [spanning_names],
+    [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
+
+    The latter form is used after deciding to fit some pseudovols (as a
+    VolumeData) against a SpanData; Doing so produces a VolumeData of those
+    pseudovols we just couldn't fit, which can be written out as usual.
+
+    Also, this seems prone (for some reason) to causing stack overflows
+    in PARI
+    """
     def __init__(self, data_dict, fails_dict = None):
         self.data = data_dict
         self.nice_fits = dict()
@@ -860,24 +901,53 @@ class SpanData:
                 data_dict[p][r] = list(data_dict[p][r])
 
     def get_polys(self):
+        """
+        Return a list of all polynomials represeted in this SpanData, as
+        strings
+        """
         return self.data.keys()
 
     def get_roots(self, poly):
+        """
+        Return a list of all roots of the given polynomial (input as a
+        string) in this SpanData, as strings
+        """
         return self.data[poly].keys()
 
     def get_spans(self, poly, root):
+        """
+        Return the spans for the given polynomial and root (input as
+        strings) of this SpanData
+        """
         return self.data[poly][root][:3]
 
     def get_pseudo_data(self, poly, root):
+        """
+        Return the pseudovolume data for the given polynomial and root
+        (input as strings) of this SpanData
+        """
         return self.data[poly][root][3:]
 
-    # If fitted, gives a dict manifold --> itf --> root --> volume --> lindep
-    # where lindep is the result of lindepping get_spans(ift,root) + [volume]
     def get_nice_fits(self):
+        """
+        If fitted, gives a dictionary chain.  The key progression of this chain is
+
+        manifold name
+          invariant trace field
+            root
+              volume
+                the result of pari's lindep() on the span for this
+                polynomial and root and this volume.
+
+        In the lindep result, the volume was inserted into the linear
+        dependence as the last element.
+        """
         return self.nice_fits
 
-    # Given a valid filename or open, write-ready file object, writes our data out to it.
     def write_to_csv(self, outfile, dset, seperator = ';', append = False):
+        """
+        Write these span results out to outfile as a csv.
+        """
         if type(outfile) == str:
             if append:
                 f = open(outfile,'a')
@@ -924,6 +994,11 @@ class SpanData:
                 f.close()
 
     def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = 4, max_itf_degree = MAX_ITF):
+        """
+        Perform fitting algorithm
+
+        TODO: Explain what this does, and what it returns
+        """
         def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
             if len(self.data[p][r]) == 3:
                 self.data[p][r].extend([list(),0,list()])
@@ -981,9 +1056,19 @@ class SpanData:
 
     # Returns a dict poly : (volume, manifold) of manifolds that couldn't be fitted in the spans.
     def get_fit_failures(self):
+        """
+        Returns a dictionary.  The keys in the dictionary are
+        polynomials (as strings), the values are lists of tuples of
+        (volume, manifold), for each volume and its accompanying
+        manifold that have the invariant trace field of the given
+        polynomial, but could not be fitted.
+        """
         return self.fit_fails
 
     def write_failures(self, outfile, seperator = ';', append = False):
+        """
+        Write the fit failures (see get_fit_failures) out to outfile as a csv
+        """
         if type(outfile) == str:
             if append:
                 f = open(outfile,'a')
@@ -1003,12 +1088,21 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-    # Writes out the linear combinations producing exotic volumes in a relatively readable format as described below
-    # The format for the combination is:
-    # k*exotic_man=k*man_1+-k*man_2+-k*man_3...
-    # where k are some nonzero integers (so no if one is negative), +- is + or -, exotic_man is Manifold,
-    # and the other manifolds names stand in for their geometric volumes
+    
     def write_nice_fits(self, outfile, seperator = ';', append = False):
+        """
+        Writes out the linear combinations producing exotic volumes in a
+        relatively readable format as described below.
+
+        The format for the combination is:
+
+
+        k1 * exotic_man = k2 * man_1 +- k3 * man_2 +- k4 * man_3...
+
+        where ki are each some nonzero integers (so no if one is
+        negative), +- is + or -, exotic_man is Manifold, and the other
+        manifolds names stand in for their geometric volumes.
+        """
         if type(outfile) == str:
             if append:
                 f = open(outfile,'a')
@@ -1046,15 +1140,18 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-# returns a SpanData for the given dataset
 def get_data_object(dset):
+    """
+    Returns best guesses for spans generated by the given dataset
+    """
     return SpanData(_span_guesses(dset))
 
-
-# Accepts volumes as strings since we store them that way.
-# Returns the dependancy found (if any) as a list of integers if all coefficents are <= maxcoeff or maxcoeff is nonpositive;
-# otherwise, it returns []
 def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
+    """
+    Given str_volumes, a list of volumes in string form, returns the
+    dependancy found (if any) as a list of integers if all coefficents
+    are <= maxcoeff or maxcoeff is nonpositive; otherwise, it returns []
+    """
     vols = list(str_vols)   # in case someone sent some other type collection
     vec = None
 

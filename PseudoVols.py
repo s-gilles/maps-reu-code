@@ -228,11 +228,9 @@ It's usually not nescecary to make these yourself; collection and read methods r
             for v in self.get_volumes(p):
                 try:
                     if float(v) < epsilon:
-                        print str(v)+'was less than '+str(epsilon)
                         del self.data[p][v]
                 except: # v was really close to 0
                     del self.data[p][v]
-                    print str(v)+'threw a value error: '+str(e)
 
     
     def clean(self, maxsfdegree=MAX_ITF, epsilon = EPSILON):

@@ -458,7 +458,7 @@ class Dataset:
             for r,re in pd.items():
                 if str(re[1]) != '0':
                     f.write('"' + str(p) + '"' + separator)
-                    f.write('"' + str(d.get_ncp(p)) + '"' + separator)
+                    f.write('"' + str(self.get_ncp(p)) + '"' + separator)
                     f.write('"' + str(r) + '"' + separator)
                     f.write('"' + str(len(re[0])) + '"' + separator)
                     f.write('"' + str(re[0]) + '"' + separator)

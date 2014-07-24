@@ -141,6 +141,10 @@ def _write_dict_to_output(output_filename = 'output.csv',  first_time = True, se
         f.close()
 
 def _drain(out):
+    """
+    Given a file-ish object, read from it until there is no more to
+    immediately read, then return the result.
+    """
     result = ''
     incremental = ''
     while True:
@@ -152,17 +156,21 @@ def _drain(out):
         except OSError:
             return result
 
-# Initializes a snap process, waits for it to print out some preliminary
-# information, then returns that snap process. If the snap process fails at
-# all, this method will not return in a timely fashion. Therefore, all threads
-# should perform
-#
-#     _snap_process[my_unique_thread_id] = _kickoff_snap()
-#
-# as their first action. After a suitable waiting period (say 0.1s), those
-# threads corresponding to id's for which _snap_process[id] is None are
-# definitely hung, and may be restarted
+
 def _kickoff_snap(temp_file_dir, snap_path = SNAP_PATH):
+    """
+    Initializes a snap process, waits for it to print out some preliminary
+    information, then returns that snap process. If the snap process
+    fails at all, this method will not return in a timely
+    fashion. Therefore, all threads dedicated to finding volumes should
+    perform
+
+    _snap_process[my_unique_thread_id] = _kickoff_snap()
+
+    as their first action. After a suitable waiting period (say 0.1s), those
+    threads corresponding to id's for which _snap_process[id] is None are
+    definitely hung, and may be restarted.
+    """
     cprocess = subprocess.Popen([snap_path],
                                 bufsize = 1,
                                 shell = False,
@@ -184,10 +192,13 @@ def _kickoff_snap(temp_file_dir, snap_path = SNAP_PATH):
     _send_cmd(cprocess, 'set path ' + temp_file_dir + '\n')
     return cprocess
 
-# Emulates typing string into a terminal running process. Note that since snap
-# displays a prompt, entering '\n' causes snap's stdout to immediately echo the
-# prompt plus string. This must be eaten, otherwise the process will hang.
 def _send_cmd(process, string):
+    """
+    Emulates typing string into a terminal running process (intended to
+    be a snap process). Note that since snap displays a prompt, entering
+    '\n' causes snap's stdout to immediately echo the prompt plus
+    string. This must be eaten, otherwise the process will hang.
+    """
     process.stdin.write((string + '\n').encode(encoding = 'UTF-8'))
     process.stdin.flush()
     return _drain(process.stdout)

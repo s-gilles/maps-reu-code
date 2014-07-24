@@ -1,14 +1,44 @@
 from cypari import *
 import itertools
+import re
+import time
+import tempfile
+import os.path
 
 from VolumeUtilities import *
+from VolumeFinder import _kickoff_snap, _send_cmd, _drain
+from VolumeFinder import RE_INV_TRACE_FIELD_NOT_FOUND, RE_FUNC_REQ_GROUP, RE_ERROR
+
+_RE_NO_BOREL = re.compile('.*Borel Regulator: not computed.*', re.DOTALL)
+_RE_BOREL_REGULATOR = re.compile('.*Borel Regulator: \[([-0-9.,]*)\].*', re.DOTALL)
 
 def find_span(elts, n, cutoff = 4096):
-    """Parameters: elts is a list [a1, a2, a3, ... ], where each ai is a (volume (as pari object), name)
+    """
+    Parameters: elts is a list [a1, a2, a3, ... ], where each ai is a
+    (volume (as pari object), name), and n is the upper limit of the
+    dimension of the span to be found.
 
-Returns: returns (s, sn, r), where s is determined to be the optimal span that is a subset of elts for an n-dimensional lattice, sn is the corresponding names for s, and r is the ratio of det(S) / d, with S the matrix formed out of s, and d the gcd of all possible such determinants.  It follows that s is a basis for elts iff r is 1.
+    Returns: returns (s, sn, r, bm, bd), where
 
-Optionally, the parameter cutoff may be passed (defaulting to 4096). This controls the upper bound on absolute values of coefficients resulting from pari's lindep that are considered relevant.  For example [sqrt(2), 0.00001] gives a linear dependence of [-160, 22627417]. In practice, this should probably be ignored."""
+    s is determined to be the optimal span that is a subset of elts for
+    an n-dimensional lattice,
+
+    sn is the corresponding names for s,
+
+    r is the ratio of det(S) / d, with S the matrix formed out of s, and
+    d the gcd of all possible such determinants (it follows that s is a
+    basis for elts iff r is 1),
+
+    Optionally, the parameter cutoff may be passed (defaulting to
+    4096). This controls the upper bound on absolute values of
+    coefficients resulting from pari's lindep that are considered
+    relevant.  For example [sqrt(2), 0.00001] gives a linear dependence
+    of [-160, 22627417]. In practice, this should probably be ignored.
+
+    Note that if a span that would have greater dimension than n would
+    be generated, this method will raise a ValueError. This indicates
+    that the input must be invalid.
+    """
 
     # Remove integer multiples, creates something like [2, 5, 7, 9, 11, ... ]
     # This could be done in the next step, but is singled out as a special case
@@ -92,6 +122,77 @@ Optionally, the parameter cutoff may be passed (defaulting to 4096). This contro
             min_det_names = names
 
     return min_det_elts, min_det / det_gcd, min_det_names
+
+def find_borel_matrix(manifold_names):
+    """Given manifold_names, a list of strings each the name of a manifold
+    (i.e., they may be passed as a constructor to SnapPy's Manifold
+    object) returns (borel_matrix, borel_matrix_determinant).
+
+    borel_matrix is a list of the Borel regulators (themselves lists) for
+    each manifold in sn (not a Pari matrix object)
+
+    borel_matrix_determinant is the determinant (a pari object) of bm if
+    it can be formed into a square matrix (all Borel regulators have the
+    same dimension, and this dimension is the same as that of
+    manifold_names), or None if it cannot.
+
+    Note: This method currently relies on the external program `snap` to
+    compute borel regulators. If errors arise, try adjusting the options
+    for snap found in VolumeUtilities.
+    """
+    borel_reg_strings = list()
+
+    next_borel_reg = _borel_regulator(manifold_names[0])
+    borel_reg_mat = gen.pari(next_borel_reg).mattranspose()
+    borel_reg_strings.append(next_borel_reg)
+
+    for next_name in manifold_names[1:]:
+        next_borel_reg = _borel_regulator(next_name)
+        borel_reg_mat = borel_reg_mat.concat(gen.pari(next_borel_reg).mattranspose())
+        borel_reg_strings.append(next_borel_reg)
+
+    borel_determinant = None
+    try:
+        borel_determinant = borel_reg_mat.matdet()
+    except:
+        pass
+
+    return borel_reg_strings, borel_determinant
+
+def _borel_regulator(manifold_name):
+    """
+    Given a manifold name, return, as a list, the volumes (in string
+    form) that make up that volume's Borel regulator.
+
+    Ex: _borel_regulator('m349') returns ['2.721625...', '4.666479...'].
+    """
+    input_manifold = Manifold(manifold_name)
+
+    trig_file_dir = tempfile.mkdtemp()
+    Manifold(manifold_name).save(os.path.join(trig_file_dir, 'tmp.trig'))
+    snap_process = _kickoff_snap(trig_file_dir)
+    try:
+        _send_cmd(snap_process, 'read file tmp.trig')
+        _send_cmd(snap_process, 'co inv co sh print ari')
+        snap_output = ''
+        wait_count = 0
+        while True:
+            snap_output += _drain(snap_process.stdout)
+            borel_match = _RE_BOREL_REGULATOR.match(snap_output)
+            if borel_match is not None:
+                return re.split(',', borel_match.group(1))
+            elif any([RE_INV_TRACE_FIELD_NOT_FOUND.match(snap_output),
+                        RE_FUNC_REQ_GROUP.match(snap_output),
+                        RE_ERROR.match(snap_output),
+                        _RE_NO_BOREL.match(snap_output)]):
+                raise Exception('Manifold ' + manifold_name + ' has incalculable Borel regulator')
+            else:
+                time.sleep(0.05)
+                wait_count += 1
+                if wait_count > 100:
+                    raise Exception('Manifold ' + manifold_name + ' appears to have hung snap')
+    finally:
+        snap_process.terminate()
 
 def _is_int(r):
     s = r % 1

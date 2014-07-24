@@ -437,22 +437,38 @@ class Dataset:
         s = _span_guesses(self)
         f = open(fname, 'w')
         f.write('Polynomial' + separator +
+                'Degree' + separator +
                 'NumberOfComplexPlaces' + separator +
                 'Root' + separator +
                 'SpanDimension' + separator +
                 'VolumeSpan' + separator +
                 'ManifoldSpan' + separator +
-                'FitRatio\n')
+                'FitRatio' + separator +
+                'BorelRegulatorMatrix' + separator +
+                'BorelRegulatorDeterminant\n')
         for p,pd in s.items():
             for r,re in pd.items():
                 if str(re[1]) != '0':
+                    borel_regs = 'N/A'
+                    borel_det = None
+                    try:
+                        borel_regs, borel_det = find_borel_matrix(re[0])
+                    except:
+                        pass
+
+                    if not borel_det:
+                        borel_det = 'N/A'
+
                     f.write('"' + str(p) + '"' + separator)
+                    f.write('"' + str(gen.pari(p).poldegree()) + '"' + separator)
                     f.write('"' + str(self.get_ncp(p)) + '"' + separator)
                     f.write('"' + str(r) + '"' + separator)
                     f.write('"' + str(len(re[0])) + '"' + separator)
                     f.write('"' + str(re[0]) + '"' + separator)
                     f.write('"' + str(re[2]) + '"' + separator)
-                    f.write('"' + str(re[1]) + '"\n')
+                    f.write('"' + str(re[1]) + '"' + separator)
+                    f.write('"' + str(borel_regs) + '"' + separator)
+                    f.write('"' + str(borel_det) + '"\n')
         f.close()
 
     def search_for_manifold(self,man):

@@ -8,6 +8,9 @@ PARI_PRECISION = 100
 LINDEP_PRECISION = 50
 EPSILON = 1e-12
 MAX_ITF = 8
+MAX_COEFF = 4096
+MAX_LDP_TRIES = 4
+MAX_LINDEP_TRIES = 50
 
 # This is designed to match SnapPy's solution_type(enum = True) output
 SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']

@@ -14,9 +14,6 @@ from fractions import Fraction
 from itertools import combinations
 from snappy import *
 
-MAX_COEFF = 4096
-SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']   # globalize
-
 # This class is just a wrapper for the structure storing polynomial/volume data.
 # Having it avoids opaque references to the particular way data is stored that might change in the future.
 
@@ -865,7 +862,7 @@ class SpanData:
     two possible forms:
 
     poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
-    
+
     poly : root : [[spanning_vols], fit_ratio, [spanning_names],
     [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
 
@@ -990,10 +987,10 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = 4, max_itf_degree = MAX_ITF):
+    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = MAX_LDP_TRIES, max_itf_degree = MAX_ITF):
         """
-        Given a VolumeData object (from PseudoVols) representing some exotic volumes, this method attempts to see if we can generate them 
-        as linear combinations of the volumes in the spans. After calling this, you can write out the fits with write_nice_fits, and 
+        Given a VolumeData object (from PseudoVols) representing some exotic volumes, this method attempts to see if we can generate them
+        as linear combinations of the volumes in the spans. After calling this, you can write out the fits with write_nice_fits, and
         if you write out the SpanData object, data on the fits will be included.
 
         When this code is run, you will get a lot of "***   polynomial not in Z[X] in galoisinit." printed out; don't worry, that's normal.
@@ -1087,7 +1084,7 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-    
+
     def write_nice_fits(self, outfile, separator = ';', append = False):
         """
         Writes out the linear combinations producing exotic volumes in a
@@ -1148,7 +1145,7 @@ def get_spandata(dset):
     """
     return SpanData(_span_guesses(dset))
 
-def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = 50):
+def _pari_lindep(str_vols, maxcoeff = MAX_COEFF, max_tries = MAX_LINDEP_TRIES):
     """
     Given str_volumes, a list of volumes in string form, returns the
     dependancy found (if any) as a list of integers if all coefficents

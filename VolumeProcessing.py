@@ -897,6 +897,7 @@ def quick_read_csv(filenm, separator = ';', sub_separator = '|'):
     Read in a csv (with header) and return a Dataset object representing
     it.  The csv should be in the form exected by read_csv
     """
+    f = None
     try:
         f = open(filenm,'r')
         f.readline()

@@ -153,7 +153,8 @@ def find_borel_matrix(manifold_names):
 
     borel_determinant = None
     try:
-        borel_determinant = borel_reg_mat.matdet()
+        if len(borel_reg_mat) == len(borel_reg_mat[0]):
+            borel_determinant = borel_reg_mat.matdet()
     except:
         pass
 

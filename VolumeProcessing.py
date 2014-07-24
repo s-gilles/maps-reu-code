@@ -12,9 +12,6 @@ from fractions import Fraction
 from itertools import combinations
 from snappy import *
 
-# This class is just a wrapper for the structure storing polynomial/volume data.
-# Having it avoids opaque references to the particular way data is stored that might change in the future.
-
 class Dataset:
     """
     A class representing a collection of computed volumes. This is
@@ -489,6 +486,347 @@ class Dataset:
                         return out
         return None
 
+class SpanData:
+    """
+    Manages interfacing with a dictionary containing the spans.  There are
+    two possible forms:
+
+    poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
+
+    poly : root : [[spanning_vols], fit_ratio, [spanning_names],
+    [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
+
+    The latter form is used after deciding to fit some pseudovols (as a
+    VolumeData) against a SpanData; Doing so produces a VolumeData of those
+    pseudovols we just couldn't fit, which can be written out as usual.
+
+    Also, this seems prone (for some reason) to causing stack overflows
+    in PARI
+    """
+    def __init__(self, data_dict, fails_dict = None):
+        self.data = data_dict
+        self.nice_fits = dict()
+        if data_dict:
+            p = data_dict.keys().__iter__().next()
+            r = data_dict[p].keys().__iter__().next()  # this really shouldn't fail
+            s = len(data_dict[p][r])
+            if s != 3 and s != 6:
+                raise ValueError    # input looks wack
+            self.fitted = (s == 6)  # records if we are in the second form described above
+        else:
+            self.fitted = False
+        self.fit_fails = None
+        if fails_dict:
+            self.fit_fails = fails_dict
+        elif self.fitted:
+            self.fit_fails = dict()
+        for p in data_dict.keys():  # got to reformat
+            for r in data_dict[p].keys():
+                data_dict[p][r] = list(data_dict[p][r])
+
+    def get_polys(self):
+        """
+        Return a list of all polynomials represeted in this SpanData, as
+        strings
+        """
+        return self.data.keys()
+
+    def get_roots(self, poly):
+        """
+        Return a list of all roots of the given polynomial (input as a
+        string) in this SpanData, as strings
+        """
+        return self.data[poly].keys()
+
+    def get_spans(self, poly, root):
+        """
+        Return the spans for the given polynomial and root (input as
+        strings) of this SpanData
+        """
+        return self.data[poly][root][:3]
+
+    def get_pseudo_data(self, poly, root):
+        """
+        Return the pseudovolume data for the given polynomial and root
+        (input as strings) of this SpanData
+        """
+        return self.data[poly][root][3:]
+
+    def get_nice_fits(self):
+        """
+        If fitted, gives a dictionary chain.  The key progression of this chain is
+
+        manifold name
+          invariant trace field
+            root
+              volume
+                the result of pari's lindep() on the span for this
+                polynomial and root and this volume.
+
+        In the lindep result, the volume was inserted into the linear
+        dependence as the last element.
+        """
+        return self.nice_fits
+
+    def write_to_csv(self, outfile, dset, separator = ';', append = False):
+        """
+        Write these span results out to outfile as a csv.
+        """
+        if type(outfile) == str:
+            if append:
+                f = open(outfile,'a')
+            else:
+                f = open(outfile,'w')
+        else:
+            f = outfile
+        try:
+            if not append:
+                f.write('Polynomial' + separator + 'NumberOfComplexPlaces' + separator + 'Root' + separator + 'SpanDimension' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio')
+                if self.fitted:
+                    f.write(separator + 'SolvedPseudoVolumes' + separator + 'SolvedNames' + separator + 'UnsolvedPseudoVolumes' + separator + 'UnsolvedNames' + separator + 'PseudoFitRatio')
+                f.write('\n')
+            for p in self.get_polys():
+                for r in self.get_roots(p):
+                    re = self.data[p][r]
+                    f.write('"' + str(p) + '"' + separator)
+                    try:
+                        f.write('"' + str(dset.get_ncp(p)) + '"' + separator)
+                    except: # don't give up because dset was surprised
+                        f.write('"?"' + separator)
+                    f.write('"' + str(r) + '"' + separator)
+                    f.write('"' + str(len(re[0])) + '"' + separator)
+                    f.write('"' + str(re[0]) + '"' + separator)
+                    f.write('"' + str(re[2]) + '"' + separator)
+                    f.write('"' + str(re[1]) + '"')
+                    if self.fitted:
+                        f.write(separator)
+                        if len(re) == 6:
+                            f.write('"' + str([t[0] for t in re[3]]) + '"' + separator)
+                            f.write('"' + str([t[1] for t in re[3]]) + '"' + separator)
+                            f.write('"' + str([t[0] for t in re[5]]) + '"' + separator)
+                            f.write('"' + str([t[1] for t in re[5]]) + '"' + separator)
+                            f.write('"' + str(re[4]) + '"')
+                        else:
+                            f.write('"None"' + separator)
+                            f.write('"None"' + separator)
+                            f.write('"None"' + separator)
+                            f.write('"None"' + separator)
+                            f.write('"1"')
+                    f.write('\n')
+        finally:
+            if type(outfile) == str:
+                f.close()
+
+    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = MAX_LDP_TRIES, max_itf_degree = MAX_ITF):
+        """
+        Given a VolumeData object (from PseudoVols) representing some exotic volumes, this method attempts to see if we can generate them
+        as linear combinations of the volumes in the spans. After calling this, you can write out the fits with write_nice_fits, and
+        if you write out the SpanData object, data on the fits will be included.
+
+        When this code is run, you will get a lot of "***   polynomial not in Z[X] in galoisinit." printed out; don't worry, that's normal.
+        """
+        def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
+            if len(self.data[p][r]) == 3:
+                self.data[p][r].extend([list(),0,list()])
+        def _fit(p,rec):      # this exists to break multiple layers
+            cand = None     # previous best fit
+            for tf in get_potential_trace_fields(p):
+                tf = tf.replace(' ','')
+                if tf in self.get_polys():
+                    for r in self.get_roots(tf):
+                        if 'Error' in self.data[tf][r]:
+                            print 'Couldn\'t handle '+str(self.data[tf][r]) # can't handle the format
+                            continue                                        # so we skip this one
+                        ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff, max_tries = max_ldp_tries)
+                        if ldp and ldp[-1] != 0:
+                            if abs(ldp[-1]) == 1:    # the match was perfect, update the data
+                                _fresz(tf,r)
+                                self.data[tf][r][3].append(rec)
+                                self.nice_fits.setdefault(rec[1],dict()).setdefault(tf,dict()).setdefault(r,dict())[rec[0]] = ldp
+                                return
+                            else:   # the match was imperfect, maybe a better fit awaits
+                                if not cand or cand[1][-1] > ldp[-1]:   # better than previous best fit
+                                    cand = ((tf,r),ldp) # we store the whole lindep for later
+            if cand:    # have a rational but not integral fit
+                _fresz(cand[0][0],cand[0][1])
+                self.data[cand[0][0]][cand[0][1]][5].append(rec)
+                self.nice_fits.setdefault(rec[1],dict()).setdefault(cand[0][0],dict()).setdefault(cand[0][1],dict())[rec[0]] = cand[1]
+            else:       # no rational fit, store the failure
+                self.fit_fails.setdefault(p,list()).append(rec)
+        if not self.fitted:
+            self.fitted = True
+            if not self.fit_fails:
+                self.fit_fails = dict()
+        for p in voldata.get_polys():
+            for v in voldata.get_volumes(p):
+                for m in voldata.get_manifolds(p,v):
+                    _fit(p,(v,m))   # TODO fix this innefficent implementation (much redundnacy; should be once / v)
+        for p in self.get_polys():      # got to recalc psuedo fit ratios
+            for r in self.get_roots(p):
+                if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play
+                    if self.data[p][r][5]:  # TODO: make this record if coeff > fit ratio
+                        dim = len(self.data[p][r][0])
+                        vecs = list()
+                        for n in xrange(dim):   # put in basis unit vectors
+                            vecs.append([0]*dim)
+                            vecs[n][n] = 1
+                        for v in [rec[0] for rec in self.data[p][r][5]]:    # put in vectors for non-integral combinations
+                            pldp = _pari_lindep(self.data[p][r][0]+[v])
+                            vecs.append([Fraction(numerator = -1*x, denominator = pldp[-1]) for x in pldp[:-1]])
+                        dets = list()
+                        for c in combinations(vecs,dim):
+                            dets.append(abs(det(c)))
+                        self.data[p][r][4] = _gcd([Fraction(d) for d in dets])
+                    else:   # all volumes fit integrally, so
+                        self.data[p][r][4] = 1
+
+    # Returns a dict poly : (volume, manifold) of manifolds that couldn't be fitted in the spans.
+    def get_fit_failures(self):
+        """
+        Returns a dictionary.  The keys in the dictionary are
+        polynomials (as strings), the values are lists of tuples of
+        (volume, manifold), for each volume and its accompanying
+        manifold that have the invariant trace field of the given
+        polynomial, but could not be fitted.
+        """
+        return self.fit_fails
+
+    def write_failures(self, outfile, separator = ';', append = False):
+        """
+        Write the fit failures (see get_fit_failures) out to outfile as a csv
+        """
+        if type(outfile) == str:
+            if append:
+                f = open(outfile,'a')
+            else:
+                f = open(outfile,'w')
+        else:
+            f = outfile
+        try:
+            if not append:
+                f.write('TraceField' + separator + 'Volume' + separator + 'Manifold\n')
+            for p in self.fit_fails.keys(): # was this working without keys?
+                for rec in self.fit_fails[p]:
+                    f.write('"'+str(p)+'"'+separator)
+                    f.write('"'+str(rec[0])+'"'+separator)
+                    f.write('"'+str(rec[1])+'"\n')
+        finally:
+            if type(outfile) == str:
+                f.close()
+
+
+    def write_nice_fits(self, outfile, separator = ';', append = False):
+        """
+        Writes out the linear combinations producing exotic volumes in a
+        relatively readable format as described below.
+
+        The format for the combination is:
+
+
+        k1 * exotic_man = k2 * man_1 +- k3 * man_2 +- k4 * man_3...
+
+        where ki are each some nonzero integers (so no if one is
+        negative), +- is + or -, exotic_man is Manifold, and the other
+        manifolds names stand in for their geometric volumes.
+        """
+        if type(outfile) == str:
+            if append:
+                f = open(outfile,'a')
+            else:
+                f = open(outfile,'w')
+        else:
+            f = outfile
+        try:
+            if not append:
+                f.write('Manifold'+separator+'InvTraceField'+separator+'Root'+separator+'Volume'+separator+'Combination\n')
+            for m in self.nice_fits.keys():
+                for itf in self.nice_fits[m].keys():
+                    for r in self.nice_fits[m][itf].keys():
+                        for v in self.nice_fits[m][itf][r].keys():
+                            ldp = self.nice_fits[m][itf][r][v]
+                            comb = str(ldp[-1])+'*'+m+'='
+                            for n in xrange(len(ldp)-1):
+                                if n != 0 and -1*ldp[n] > 0:  # don't add a plus sign for the first term
+                                    comb += '+'
+                                if ldp[n] != 0:
+                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[1][n]
+                            f.write('"'+m+'"'+separator)
+                            f.write('"'+itf+'"'+separator)
+                            f.write('"'+r+'"'+separator)
+                            f.write('"'+v+'"'+separator)
+                            f.write('"'+comb+'"\n')
+            for p in self.fit_fails.keys():
+                for rec in self.fit_fails[p]:
+                    f.write('"'+str(rec[1])+'"'+separator)
+                    try:
+                        f.write('"'+str(pari(str(p)).polredabs())+'"'+separator)
+                    except: # cypari.gen.error or w/e from polredabs failing
+                        f.write('"'+str(p)+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
+                    f.write('"'+'TraceField'+'"'+separator)
+                    f.write('"'+str(rec[0])+'"'+separator)
+                    f.write('"'+'None'+'"\n')
+        finally:
+            if type(outfile) == str:
+                f.close()
+
+class VolumeData:
+    """
+    A structure that contains volumes and their accompanying manifolds
+    for each invariant trace field polynomial
+    """
+    # structure: dict poly ---> (volume, manifold)
+    def __init__(self, data = dict()):
+        self.data = data
+
+    def get_polys(self):
+        """
+        Returns a list of all polynomials with data held by this
+        VolumeData
+        """
+        return self.data.keys()
+
+    def get_volumes(self,poly):
+        """
+        Returns a list of all volumes for this polynomial known to this
+        VolumeData
+        """
+        return [rec[0] for rec in self.data[poly]]
+
+    def get_manifolds(self,poly):
+        """
+        Returns a list of all manifolds for this polynomial known to
+        this VolumeData
+        """
+        return [rec[1] for rec in self.data[poly]]
+
+    def get_volume_data(self,poly):
+        """
+        Returns a list containing tuples, each of which is (v,m),
+        representing a volume and a manifold. This list contains all
+        such (volume, manifold) pairings for this polynomial known to
+        this VolumeData
+        """
+        return self.data[poly]
+
+    def combine_with(self,other):
+        """
+        Returns a new VolumeData object. This VolumeData object contains
+        all (volume, manifold) pairs (and their associated polynomials)
+        which are contained in either this VolumeData object or other.
+
+        Note: if this VolumeData and other contain contradictory
+        information, both will be stored in the resultant VolumeData
+        object. This may result in, for example, two different tuples
+        recording slightly different volumes for the same manifold under
+        the same polynomial.
+        """
+        new_data = dict()
+
+        all_polys = set(self.data.keys() + other.data.keys())
+        for poly in all_polys:
+            new_data[poly] = self.data.get(poly, list()) + other.data.get(poly, list())
+        return VolumeData(data = new_data)
+
 def _niceness(nm):
     n = 0.0
     k = nm[0]
@@ -847,295 +1185,6 @@ def read_spans(fname, separator = ';'):
         spans.setdefault(w[0],dict())[w[2]] = w[4:]
     return spans
 
-# Manages interfacing with a dictionary containing the spans.
-# There are two possible forms:
-# poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
-# poly : root : [[spanning_vols], fit_ratio, [spanning_names], [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
-# The latter form is used after deciding to fit some pseudovols (as a VolumeData) against a SpanData;
-# Doing so produces a VolumeData of those pseudovols we just couldn't fit, which can be written out as usual
-# Also, this seems prone (for some reason) to causing stack overflows in PARI
-class SpanData:
-    """
-    Manages interfacing with a dictionary containing the spans.  There are
-    two possible forms:
-
-    poly : root : [[spanning_vols], fit_ratio, [spanning_names]]
-
-    poly : root : [[spanning_vols], fit_ratio, [spanning_names],
-    [good_pseudo(vols,names)], pseudo_fit_ratio, [bad_pseudo(vols,names)]]
-
-    The latter form is used after deciding to fit some pseudovols (as a
-    VolumeData) against a SpanData; Doing so produces a VolumeData of those
-    pseudovols we just couldn't fit, which can be written out as usual.
-
-    Also, this seems prone (for some reason) to causing stack overflows
-    in PARI
-    """
-    def __init__(self, data_dict, fails_dict = None):
-        self.data = data_dict
-        self.nice_fits = dict()
-        if data_dict:
-            p = data_dict.keys().__iter__().next()
-            r = data_dict[p].keys().__iter__().next()  # this really shouldn't fail
-            s = len(data_dict[p][r])
-            if s != 3 and s != 6:
-                raise ValueError    # input looks wack
-            self.fitted = (s == 6)  # records if we are in the second form described above
-        else:
-            self.fitted = False
-        self.fit_fails = None
-        if fails_dict:
-            self.fit_fails = fails_dict
-        elif self.fitted:
-            self.fit_fails = dict()
-        for p in data_dict.keys():  # got to reformat
-            for r in data_dict[p].keys():
-                data_dict[p][r] = list(data_dict[p][r])
-
-    def get_polys(self):
-        """
-        Return a list of all polynomials represeted in this SpanData, as
-        strings
-        """
-        return self.data.keys()
-
-    def get_roots(self, poly):
-        """
-        Return a list of all roots of the given polynomial (input as a
-        string) in this SpanData, as strings
-        """
-        return self.data[poly].keys()
-
-    def get_spans(self, poly, root):
-        """
-        Return the spans for the given polynomial and root (input as
-        strings) of this SpanData
-        """
-        return self.data[poly][root][:3]
-
-    def get_pseudo_data(self, poly, root):
-        """
-        Return the pseudovolume data for the given polynomial and root
-        (input as strings) of this SpanData
-        """
-        return self.data[poly][root][3:]
-
-    def get_nice_fits(self):
-        """
-        If fitted, gives a dictionary chain.  The key progression of this chain is
-
-        manifold name
-          invariant trace field
-            root
-              volume
-                the result of pari's lindep() on the span for this
-                polynomial and root and this volume.
-
-        In the lindep result, the volume was inserted into the linear
-        dependence as the last element.
-        """
-        return self.nice_fits
-
-    def write_to_csv(self, outfile, dset, separator = ';', append = False):
-        """
-        Write these span results out to outfile as a csv.
-        """
-        if type(outfile) == str:
-            if append:
-                f = open(outfile,'a')
-            else:
-                f = open(outfile,'w')
-        else:
-            f = outfile
-        try:
-            if not append:
-                f.write('Polynomial' + separator + 'NumberOfComplexPlaces' + separator + 'Root' + separator + 'SpanDimension' + separator + 'VolumeSpan' + separator + 'ManifoldSpan' + separator + 'FitRatio')
-                if self.fitted:
-                    f.write(separator + 'SolvedPseudoVolumes' + separator + 'SolvedNames' + separator + 'UnsolvedPseudoVolumes' + separator + 'UnsolvedNames' + separator + 'PseudoFitRatio')
-                f.write('\n')
-            for p in self.get_polys():
-                for r in self.get_roots(p):
-                    re = self.data[p][r]
-                    f.write('"' + str(p) + '"' + separator)
-                    try:
-                        f.write('"' + str(dset.get_ncp(p)) + '"' + separator)
-                    except: # don't give up because dset was surprised
-                        f.write('"?"' + separator)
-                    f.write('"' + str(r) + '"' + separator)
-                    f.write('"' + str(len(re[0])) + '"' + separator)
-                    f.write('"' + str(re[0]) + '"' + separator)
-                    f.write('"' + str(re[2]) + '"' + separator)
-                    f.write('"' + str(re[1]) + '"')
-                    if self.fitted:
-                        f.write(separator)
-                        if len(re) == 6:
-                            f.write('"' + str([t[0] for t in re[3]]) + '"' + separator)
-                            f.write('"' + str([t[1] for t in re[3]]) + '"' + separator)
-                            f.write('"' + str([t[0] for t in re[5]]) + '"' + separator)
-                            f.write('"' + str([t[1] for t in re[5]]) + '"' + separator)
-                            f.write('"' + str(re[4]) + '"')
-                        else:
-                            f.write('"None"' + separator)
-                            f.write('"None"' + separator)
-                            f.write('"None"' + separator)
-                            f.write('"None"' + separator)
-                            f.write('"1"')
-                    f.write('\n')
-        finally:
-            if type(outfile) == str:
-                f.close()
-
-    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = MAX_LDP_TRIES, max_itf_degree = MAX_ITF):
-        """
-        Given a VolumeData object (from PseudoVols) representing some exotic volumes, this method attempts to see if we can generate them
-        as linear combinations of the volumes in the spans. After calling this, you can write out the fits with write_nice_fits, and
-        if you write out the SpanData object, data on the fits will be included.
-
-        When this code is run, you will get a lot of "***   polynomial not in Z[X] in galoisinit." printed out; don't worry, that's normal.
-        """
-        def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
-            if len(self.data[p][r]) == 3:
-                self.data[p][r].extend([list(),0,list()])
-        def _fit(p,rec):      # this exists to break multiple layers
-            cand = None     # previous best fit
-            for tf in get_potential_trace_fields(p):
-                tf = tf.replace(' ','')
-                if tf in self.get_polys():
-                    for r in self.get_roots(tf):
-                        if 'Error' in self.data[tf][r]:
-                            print 'Couldn\'t handle '+str(self.data[tf][r]) # can't handle the format
-                            continue                                        # so we skip this one
-                        ldp = _pari_lindep(self.get_spans(tf,r)[0]+[rec[0]], maxcoeff = maxcoeff, max_tries = max_ldp_tries)
-                        if ldp and ldp[-1] != 0:
-                            if abs(ldp[-1]) == 1:    # the match was perfect, update the data
-                                _fresz(tf,r)
-                                self.data[tf][r][3].append(rec)
-                                self.nice_fits.setdefault(rec[1],dict()).setdefault(tf,dict()).setdefault(r,dict())[rec[0]] = ldp
-                                return
-                            else:   # the match was imperfect, maybe a better fit awaits
-                                if not cand or cand[1][-1] > ldp[-1]:   # better than previous best fit
-                                    cand = ((tf,r),ldp) # we store the whole lindep for later
-            if cand:    # have a rational but not integral fit
-                _fresz(cand[0][0],cand[0][1])
-                self.data[cand[0][0]][cand[0][1]][5].append(rec)
-                self.nice_fits.setdefault(rec[1],dict()).setdefault(cand[0][0],dict()).setdefault(cand[0][1],dict())[rec[0]] = cand[1]
-            else:       # no rational fit, store the failure
-                self.fit_fails.setdefault(p,list()).append(rec)
-        if not self.fitted:
-            self.fitted = True
-            if not self.fit_fails:
-                self.fit_fails = dict()
-        for p in voldata.get_polys():
-            for v in voldata.get_volumes(p):
-                for m in voldata.get_manifolds(p,v):
-                    _fit(p,(v,m))   # TODO fix this innefficent implementation (much redundnacy; should be once / v)
-        for p in self.get_polys():      # got to recalc psuedo fit ratios
-            for r in self.get_roots(p):
-                if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play
-                    if self.data[p][r][5]:  # TODO: make this record if coeff > fit ratio
-                        dim = len(self.data[p][r][0])
-                        vecs = list()
-                        for n in xrange(dim):   # put in basis unit vectors
-                            vecs.append([0]*dim)
-                            vecs[n][n] = 1
-                        for v in [rec[0] for rec in self.data[p][r][5]]:    # put in vectors for non-integral combinations
-                            pldp = _pari_lindep(self.data[p][r][0]+[v])
-                            vecs.append([Fraction(numerator = -1*x, denominator = pldp[-1]) for x in pldp[:-1]])
-                        dets = list()
-                        for c in combinations(vecs,dim):
-                            dets.append(abs(det(c)))
-                        self.data[p][r][4] = _gcd([Fraction(d) for d in dets])
-                    else:   # all volumes fit integrally, so
-                        self.data[p][r][4] = 1
-
-    # Returns a dict poly : (volume, manifold) of manifolds that couldn't be fitted in the spans.
-    def get_fit_failures(self):
-        """
-        Returns a dictionary.  The keys in the dictionary are
-        polynomials (as strings), the values are lists of tuples of
-        (volume, manifold), for each volume and its accompanying
-        manifold that have the invariant trace field of the given
-        polynomial, but could not be fitted.
-        """
-        return self.fit_fails
-
-    def write_failures(self, outfile, separator = ';', append = False):
-        """
-        Write the fit failures (see get_fit_failures) out to outfile as a csv
-        """
-        if type(outfile) == str:
-            if append:
-                f = open(outfile,'a')
-            else:
-                f = open(outfile,'w')
-        else:
-            f = outfile
-        try:
-            if not append:
-                f.write('TraceField' + separator + 'Volume' + separator + 'Manifold\n')
-            for p in self.fit_fails.keys(): # was this working without keys?
-                for rec in self.fit_fails[p]:
-                    f.write('"'+str(p)+'"'+separator)
-                    f.write('"'+str(rec[0])+'"'+separator)
-                    f.write('"'+str(rec[1])+'"\n')
-        finally:
-            if type(outfile) == str:
-                f.close()
-
-
-    def write_nice_fits(self, outfile, separator = ';', append = False):
-        """
-        Writes out the linear combinations producing exotic volumes in a
-        relatively readable format as described below.
-
-        The format for the combination is:
-
-
-        k1 * exotic_man = k2 * man_1 +- k3 * man_2 +- k4 * man_3...
-
-        where ki are each some nonzero integers (so no if one is
-        negative), +- is + or -, exotic_man is Manifold, and the other
-        manifolds names stand in for their geometric volumes.
-        """
-        if type(outfile) == str:
-            if append:
-                f = open(outfile,'a')
-            else:
-                f = open(outfile,'w')
-        else:
-            f = outfile
-        try:
-            if not append:
-                f.write('Manifold'+separator+'InvTraceField'+separator+'Root'+separator+'Volume'+separator+'Combination\n')
-            for m in self.nice_fits.keys():
-                for itf in self.nice_fits[m].keys():
-                    for r in self.nice_fits[m][itf].keys():
-                        for v in self.nice_fits[m][itf][r].keys():
-                            ldp = self.nice_fits[m][itf][r][v]
-                            comb = str(ldp[-1])+'*'+m+'='
-                            for n in xrange(len(ldp)-1):
-                                if n != 0 and -1*ldp[n] > 0:  # don't add a plus sign for the first term
-                                    comb += '+'
-                                if ldp[n] != 0:
-                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[1][n]
-                            f.write('"'+m+'"'+separator)
-                            f.write('"'+itf+'"'+separator)
-                            f.write('"'+r+'"'+separator)
-                            f.write('"'+v+'"'+separator)
-                            f.write('"'+comb+'"\n')
-            for p in self.fit_fails.keys():
-                for rec in self.fit_fails[p]:
-                    f.write('"'+str(rec[1])+'"'+separator)
-                    try:
-                        f.write('"'+str(pari(str(p)).polredabs())+'"'+separator)
-                    except: # cypari.gen.error or w/e from polredabs failing
-                        f.write('"'+str(p)+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
-                    f.write('"'+'TraceField'+'"'+separator)
-                    f.write('"'+str(rec[0])+'"'+separator)
-                    f.write('"'+'None'+'"\n')
-        finally:
-            if type(outfile) == str:
-                f.close()
 
 def get_spandata(dset):
     """
@@ -1201,65 +1250,6 @@ def get_all_volumes(m_name, engine = None):
         else:
             v = m.ptolemy_variety(2,'all').compute_solutions(numerical = True, engine = engine)
     return list([str(g.real()) for g in [x for s in v.complex_volume_numerical() for x in s][0]]) # Structural monstrosity, sorry.
-
-class VolumeData:
-    """
-    A structure that contains volumes and their accompanying manifolds
-    for each invariant trace field polynomial
-    """
-    # structure: dict poly ---> (volume, manifold)
-    def __init__(self, data = dict()):
-        self.data = data
-
-    def get_polys(self):
-        """
-        Returns a list of all polynomials with data held by this
-        VolumeData
-        """
-        return self.data.keys()
-
-    def get_volumes(self,poly):
-        """
-        Returns a list of all volumes for this polynomial known to this
-        VolumeData
-        """
-        return [rec[0] for rec in self.data[poly]]
-
-    def get_manifolds(self,poly):
-        """
-        Returns a list of all manifolds for this polynomial known to
-        this VolumeData
-        """
-        return [rec[1] for rec in self.data[poly]]
-
-    def get_volume_data(self,poly):
-        """
-        Returns a list containing tuples, each of which is (v,m),
-        representing a volume and a manifold. This list contains all
-        such (volume, manifold) pairings for this polynomial known to
-        this VolumeData
-        """
-        return self.data[poly]
-
-    def combine_with(self,other):
-        """
-        Returns a new VolumeData object. This VolumeData object contains
-        all (volume, manifold) pairs (and their associated polynomials)
-        which are contained in either this VolumeData object or other.
-
-        Note: if this VolumeData and other contain contradictory
-        information, both will be stored in the resultant VolumeData
-        object. This may result in, for example, two different tuples
-        recording slightly different volumes for the same manifold under
-        the same polynomial.
-        """
-        new_data = dict()
-
-        all_polys = set(self.data.keys() + other.data.keys())
-        for poly in all_polys:
-            new_data[poly] = self.data.get(poly, list()) + other.data.get(poly, list())
-        return VolumeData(data = new_data)
-
 
 # Test code
 if __name__ == '__main__':

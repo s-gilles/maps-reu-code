@@ -2,13 +2,11 @@
 
 from snappy import Manifold
 from cypari import *
-from ManifoldIterators import *
 from multiprocessing import *
 import copy
 
-# Until this gets globalized
-EPSILON = .0000000000001    # same as VolumeProcessing
-MAX_ITF = 8                 # ^
+from ManifoldIterators import *
+from VolumeUtilities import *
 
 def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, separator = ';'):
     """The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,

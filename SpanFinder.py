@@ -5,8 +5,6 @@ import itertools
 
 from VolumeUtilities import *
 
-_EPSILON = 1e-12
-
 def find_span(elts, n, cutoff = 4096):
     """Parameters: elts is a list [a1, a2, a3, ... ], where each ai is a (volume (as pari object), name)
 
@@ -99,4 +97,4 @@ Optionally, the parameter cutoff may be passed (defaulting to 4096). This contro
 
 def _is_int(r):
     s = r % 1
-    return s < _EPSILON or s + _EPSILON > 1
+    return s < EPSILON or s + EPSILON > 1

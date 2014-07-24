@@ -7,6 +7,11 @@ from math import log
 PARI_PRECISION = 100
 LINDEP_PRECISION = 50
 EPSILON = 1e-12
+MAX_ITF = 8
+
+# This is designed to match SnapPy's solution_type(enum = True) output
+SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degenerate', 'unrecognized', 'none_found']
+
 
 # *** ATTENTION USER ***
 # If you want to dynamicallly change the above constants for all sessions,

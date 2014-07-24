@@ -452,7 +452,7 @@ class Dataset:
                     borel_regs = 'N/A'
                     borel_det = None
                     try:
-                        borel_regs, borel_det = find_borel_matrix(re[0])
+                        borel_regs, borel_det = find_borel_matrix(re[2])
                     except:
                         pass
 

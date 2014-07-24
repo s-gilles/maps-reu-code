@@ -11,6 +11,7 @@ from cypari import *
 from fractions import Fraction
 from itertools import combinations
 from snappy import *
+from numpy.linalg import det
 
 class Dataset:
     """
@@ -406,7 +407,15 @@ class Dataset:
                 vols = list(vol_data.keys())
                 for v in vols:  # find close volumes
                     for w in [w for w in vols if w is not v]:
-                        if abs(float(w)-float(v)) < epsilon:
+                        try:
+                            a = float(w)
+                        except ValueError: # really tiny float
+                            a = 0
+                        try:
+                            b = float(v)
+                        except ValueError: # same
+                            b = 0
+                        if abs(a-b) < epsilon:
                             balls.append(set([v,w]))
                 def _br(balls): # combine balls by finding graph components
                     for b in balls:

@@ -117,6 +117,12 @@ def reduce_elements(alpha,
 
     If gamma cannot be computed (e.g., if one of elts is not over
     alpha), an error is raised.
+
+    The optional parameter max_coefficient restricts the absolute value
+    of each ki. If max_coefficient is specified, but is too low for the
+    algorithm to append any ki * bi for a bi which has been determined
+    useful, a ValueError will be raised. This will, however, prevent
+    possibly unbounded execution time in the case of malformed input.
     """
 
     # Calculate [Q(alpha) : Q]. This can be used to break out of the

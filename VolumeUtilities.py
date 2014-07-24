@@ -3,7 +3,7 @@ from math import log
 
 # Global constants:
 PARI_PRECISION = 100
-LINDEP_PRECISION = 50
+LINDEP_PRECISION = 16
 EPSILON = 1e-12
 MAX_ITF = 8
 MAX_COEFF = 4096

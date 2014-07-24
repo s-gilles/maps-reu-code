@@ -429,10 +429,15 @@ class Dataset:
                     vol_data[v] = nrec  # bit of an abuse of v
         return d
 
-    def write_spans(self, fname, separator = ';'):
+    def write_spans(self, fname, separator = ';', skip_borel = False):
         """
         Collect the manifolds of this dataset into spanning lattices,
         writing the results out to the file specified by fname.
+
+        Note: Computing borel regulators is quite intensive. If time
+        is at all a concern and Borel regulators are not all desired,
+        setting skip_borel to True will speed this up by many orders of
+        magnitude.
         """
         s = _span_guesses(self)
         f = open(fname, 'w')
@@ -451,10 +456,13 @@ class Dataset:
                 if str(re[1]) != '0':
                     borel_regs = 'N/A'
                     borel_det = None
-                    try:
-                        borel_regs, borel_det = find_borel_matrix(re[2])
-                    except:
-                        pass
+                    if skip_borel:
+                        borel_regs = 'Not computed'
+                    else:
+                        try:
+                            borel_regs, borel_det = find_borel_matrix(re[2])
+                        except:
+                            pass
 
                     if not borel_det:
                         borel_det = 'N/A'
@@ -1162,9 +1170,13 @@ def is_int(fl, epsilon = EPSILON): #TODO: move into utility methods
     """
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
-def quick_write_spans(in_filenames, out_filename, out_separator = ';'):
+def quick_write_spans(in_filenames, out_filename, out_separator = ';', skip_borel = False):
     """
     Compress input filenames
+
+    Note: Computing borel regulators is quite intensive. If time is at
+    all a concern and Borel regulators are not all desired, setting
+    skip_borel to True will speed this up by many orders of magnitude.
     """
     if type(in_filenames) is str: # support laziness
         in_filenames = [in_filenames]
@@ -1176,7 +1188,7 @@ def quick_write_spans(in_filenames, out_filename, out_separator = ';'):
         fi.close()
     d = read_raw_csv(lines)
     d.remove_non_geometric_elements()
-    d.write_spans(out_filename, separator = out_separator)
+    d.write_spans(out_filename, separator = out_separator, skip_borel = skip_borel)
 
 def read_spans(fname, separator = ';'):
     """

@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 from snappy import *
 from math import log
 

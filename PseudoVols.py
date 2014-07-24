@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 from snappy import Manifold
 from cypari import *
 from multiprocessing import *

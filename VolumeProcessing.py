@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 import copy
 import re
 import sys

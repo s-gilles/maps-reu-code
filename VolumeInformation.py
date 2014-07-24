@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 from snappy import *
 
 def get_all_volumes(m_name, engine = None):

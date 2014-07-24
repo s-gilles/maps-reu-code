@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from cypari import *
 from itertools import product
 from operator import __mul__

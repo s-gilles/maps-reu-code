@@ -429,15 +429,18 @@ class Dataset:
                     vol_data[v] = nrec  # bit of an abuse of v
         return d
 
-    def write_spans(self, fname, separator = ';', skip_borel = False):
+    def write_spans(self, fname, separator = ';', skip_borel = False, borel_shape_field_degree = 32):
         """
         Collect the manifolds of this dataset into spanning lattices,
         writing the results out to the file specified by fname.
 
         Note: Computing borel regulators is quite intensive. If time
         is at all a concern and Borel regulators are not all desired,
-        setting skip_borel to True will speed this up by many orders of
-        magnitude.
+        setting skip_borel to True will speed this up by many orders
+        of magnitude. The parameter borel_shape_field_degree is passed
+        directly to snap as by the command `set degree'. As it
+        increases, the computations become slower, but more results
+        are obtained.
         """
         s = _span_guesses(self)
         f = open(fname, 'w')
@@ -460,7 +463,8 @@ class Dataset:
                         borel_regs = 'Not computed'
                     else:
                         try:
-                            borel_regs, borel_det = find_borel_matrix(re[2])
+                            borel_regs, borel_det = find_borel_matrix(re[2],
+                                                                      borel_shape_field_degree)
                         except:
                             pass
 
@@ -1170,13 +1174,15 @@ def is_int(fl, epsilon = EPSILON): #TODO: move into utility methods
     """
     return fl % 1 < epsilon or 1 - (fl % 1) < epsilon
 
-def quick_write_spans(in_filenames, out_filename, out_separator = ';', skip_borel = False):
+def quick_write_spans(in_filenames, out_filename, out_separator = ';', skip_borel = False, borel_shape_field_degree = 32):
     """
     Compress input filenames
 
     Note: Computing borel regulators is quite intensive. If time is at
     all a concern and Borel regulators are not all desired, setting
-    skip_borel to True will speed this up by many orders of magnitude.
+    skip_borel to True will speed this up by many orders of
+    magnitude. See write_spans for the optional
+    borel_shape_field_degree argument.
     """
     if type(in_filenames) is str: # support laziness
         in_filenames = [in_filenames]

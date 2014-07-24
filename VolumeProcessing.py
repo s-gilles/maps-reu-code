@@ -6,7 +6,6 @@ import sys
 import traceback
 import fractions
 
-from numpy.linalg import det
 from SpanFinder import find_span
 from PseudoVols import VolumeData, get_potential_trace_fields
 from cypari import *

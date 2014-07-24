@@ -4,7 +4,7 @@ import sys
 import traceback
 import fractions
 
-from SpanFinder import find_span
+from SpanFinder import find_span, find_borel_matrix
 from PseudoVols import VolumeData, get_potential_trace_fields
 from VolumeUtilities import *
 from cypari import *

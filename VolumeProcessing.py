@@ -775,7 +775,7 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('Manifold'+separator+'InvTraceField'+separator+'Root'+separator+'Volume'+separator+'Combination\n')
+                f.write('Manifold'+separator+'Subfield'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
             for m in self.nice_fits.keys():
                 for itf in self.nice_fits[m].keys():
                     for r in self.nice_fits[m][itf].keys():
@@ -796,10 +796,10 @@ class SpanData:
                 for rec in self.fit_fails[p]:
                     f.write('"'+str(rec[1])+'"'+separator)
                     try:
-                        f.write('"'+str(pari(str(p)).polredabs())+'"'+separator)
+                        f.write('"'+str(pari(str(p)).polredabs()).replace(' ','')+'"'+separator)
                     except: # cypari.gen.error or w/e from polredabs failing
-                        f.write('"'+str(p)+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
-                    f.write('"'+'TraceField'+'"'+separator)
+                        f.write('"'+str(p).replace(' ','')+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
+                    f.write('"'+'NoneFound'+'"'+separator)
                     f.write('"'+str(rec[0])+'"'+separator)
                     f.write('"'+'None'+'"\n')
         finally:

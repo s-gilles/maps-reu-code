@@ -123,10 +123,11 @@ def find_span(elts, n, cutoff = 4096):
 
     return min_det_elts, min_det / det_gcd, min_det_names
 
-def find_borel_matrix(manifold_names):
-    """Given manifold_names, a list of strings each the name of a manifold
-    (i.e., they may be passed as a constructor to SnapPy's Manifold
-    object) returns (borel_matrix, borel_matrix_determinant).
+def find_borel_matrix(manifold_names, shape_field_degree):
+    """
+    Given manifold_names, a list of strings each the name of a
+    manifold (i.e., they may be passed as a constructor to SnapPy's
+    Manifold object) returns (borel_matrix, borel_matrix_determinant).
 
     borel_matrix is a list of the Borel regulators (themselves lists) for
     each manifold in sn (not a Pari matrix object)
@@ -136,18 +137,22 @@ def find_borel_matrix(manifold_names):
     same dimension, and this dimension is the same as that of
     manifold_names), or None if it cannot.
 
+    The parameter shape_field_degree is passed directly to
+    snap as by the command `set degree'. As it increases, the
+    computations become slower, but fewer exceptions are raised.
+
     Note: This method currently relies on the external program `snap` to
     compute borel regulators. If errors arise, try adjusting the options
     for snap found in VolumeUtilities.
     """
     borel_reg_strings = list()
 
-    next_borel_reg = _borel_regulator(manifold_names[0])
+    next_borel_reg = _borel_regulator(manifold_names[0], shape_field_degree)
     borel_reg_mat = gen.pari(next_borel_reg).mattranspose()
     borel_reg_strings.append(next_borel_reg)
 
     for next_name in manifold_names[1:]:
-        next_borel_reg = _borel_regulator(next_name)
+        next_borel_reg = _borel_regulator(next_name, shape_field_degree)
         borel_reg_mat = borel_reg_mat.concat(gen.pari(next_borel_reg).mattranspose())
         borel_reg_strings.append(next_borel_reg)
 
@@ -160,10 +165,13 @@ def find_borel_matrix(manifold_names):
 
     return borel_reg_strings, borel_determinant
 
-def _borel_regulator(manifold_name):
+def _borel_regulator(manifold_name, shape_field_degree):
     """
     Given a manifold name, return, as a list, the volumes (in string
-    form) that make up that volume's Borel regulator.
+    form) that make up that volume's Borel regulator. The parameter
+    shape_field_degree is passed directly to snap as by the command
+    `set degree'. As it increases, the computations become slower, but
+    fewer exceptions are raised.
 
     Ex: _borel_regulator('m349') returns ['2.721625...', '4.666479...'].
     """
@@ -173,6 +181,8 @@ def _borel_regulator(manifold_name):
     Manifold(manifold_name).save(os.path.join(trig_file_dir, 'tmp.trig'))
     snap_process = _kickoff_snap(trig_file_dir)
     try:
+        _send_cmd(snap_process, 'set precision 25')
+        _send_cmd(snap_process, 'set degree ' + str(int(shape_field_degree)))
         _send_cmd(snap_process, 'read file tmp.trig')
         _send_cmd(snap_process, 'co inv co sh print ari')
         snap_output = ''
@@ -188,9 +198,9 @@ def _borel_regulator(manifold_name):
                         _RE_NO_BOREL.match(snap_output)]):
                 raise Exception('Manifold ' + manifold_name + ' has incalculable Borel regulator')
             else:
-                time.sleep(0.05)
+                time.sleep(0.25)
                 wait_count += 1
-                if wait_count > 100:
+                if wait_count > 50:
                     raise Exception('Manifold ' + manifold_name + ' appears to have hung snap')
     finally:
         snap_process.terminate()

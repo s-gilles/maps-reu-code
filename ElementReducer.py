@@ -181,9 +181,9 @@ def reduce_elements(alpha,
             powers_of_gamma = list()
             powers_of_gamma.append(gen.pari(1).Mod(alpha.mod()))
             powers_of_gamma.append(gamma)
-            for i in range(1, m+1):
-                powers_of_gamma.append(proposed_gamma ** i)
-                powers_of_gamma.append(gamma * (proposed_gamma ** i))
+            for d in range(1, m+1):
+                powers_of_gamma.append(proposed_gamma ** d)
+                powers_of_gamma.append(gamma * (proposed_gamma ** d))
 
             # Make sure [ Q(proposed_gamma, gamma) : Q(gamma) ] <= m
             if not bool(_matker(powers_of_gamma)):

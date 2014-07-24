@@ -3,8 +3,9 @@
 from cypari import *
 import itertools
 
+from VolumeUtilities import *
+
 _EPSILON = 1e-12
-gen.pari.set_real_precision(100)
 
 def find_span(elts, n, cutoff = 4096):
     """Parameters: elts is a list [a1, a2, a3, ... ], where each ai is a (volume (as pari object), name)
@@ -39,7 +40,7 @@ Optionally, the parameter cutoff may be passed (defaulting to 4096). This contro
         else:
             test_vec = rational_basis[:]
             test_vec.insert(0, vol)
-            lindep_results = gen.pari(test_vec).lindep()
+            lindep_results = gen.pari(test_vec).lindep(LINDEP_PRECISION)
             if lindep_results[0] == 1:
                 # This volume may be expressed as a linear, integral
                 # combination of others. It is worthless.

@@ -15,9 +15,11 @@ SOL_TYPE_STRINGS = ['not_attempted', 'geometric', 'nongeometric', 'flat', 'degen
 
 
 # *** ATTENTION USER ***
-# If you want to dynamicallly change the above constants for all sessions,
-# or just want to keep the default values so you can revert,
-# do so here! That way the values will both be used and tested in the warning system below
+#
+# If you want to dynamicallly change the above constants for all
+# sessions, or just want to keep the default values so you can revert,
+# do so here! That way the values will both be used and tested in the
+# warning system below
 
 # User definitions:
 

@@ -371,13 +371,28 @@ class Dataset:
             if not self.get_roots(p):
                 del self.data[p]
 
-    def get_nice_manifold_name(self,poly,root,vol):
+    def get_nice_manifold_name(self,poly,root,vol,epsilon = EPSILON):
         """
         For a (polynomial, root, volume) triple (all input a strings),
-        return the ``nicest'' matching manifold.
+        return the ``nicest'' matching manifold with volume within epsilon and same concrete invariant trace field.
+        To get only exact matches, set epsilon = 0
+        If you give a volume python can't make into a float (mostly 0+ from rounding errors),
+        only exact matches will be used anyway; and such a volume will never come up any other way.
         """
-        nms = [rec[0] for rec in self.get_manifold_data(poly,root,vol)]
+        nms = [rec[0] for rec in self.get_manifold_data(poly,root,vol)] # don't fix if not broke
         nms.extend(self.get_pared_manifolds(poly,root,vol))
+        if epsilon != 0:
+            try:
+                u = float(vol)
+            except ValueError:  # Give up on epsilon stuff
+                return get_nice_manifold_name(self,poly,root,vol,epsilon=0)
+            for v in self.get_volumes(poly,root):
+                try:
+                    if abs(float(v) - u) < epsilon:
+                        nms.extend([rec[0] for rec in self.get_manifold_data(poly,root,v)])
+                        nms.extend(self.get_pared_manifolds(poly,root,v))
+                except ValueError:  # again bad float, probably 0+
+                    continue
         opt = ('', sys.float_info.max)
         for nm in nms:
             if 0 < len(nm) < opt[1]:    # TODO: finish _niceness and replace len with it; why is 0 < required?

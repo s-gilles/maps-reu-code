@@ -165,20 +165,35 @@ def find_borel_matrix(manifold_names, shape_field_degree):
 
     return borel_reg_strings, borel_determinant
 
-def _borel_regulator(manifold_name, shape_field_degree):
+def _borel_regulator(manifold, shape_field_degree, temp_dir = None):
     """
-    Given a manifold name, return, as a list, the volumes (in string
-    form) that make up that volume's Borel regulator. The parameter
+    Given a manifold (either its name as a string, or a Manifold
+    object itself), return, as a list, the volumes (in string form)
+    that make up that manifold's Borel regulator. The parameter
     shape_field_degree is passed directly to snap as by the command
     `set degree'. As it increases, the computations become slower, but
     fewer exceptions are raised.
 
     Ex: _borel_regulator('m349') returns ['2.721625...', '4.666479...'].
-    """
-    input_manifold = Manifold(manifold_name)
 
-    trig_file_dir = tempfile.mkdtemp()
-    Manifold(manifold_name).save(os.path.join(trig_file_dir, 'tmp.trig'))
+    Note: By default, for each invocation of this method a temporary
+    directory is created. To avoid clutter, the optional argument
+    temp_dir can be passed instead. This may introduce race conditions
+    if other threads are using the same temp_dir for this method, but
+    if such a temp_dir is known to be used by only one thread, this
+    method will remain threadsafe.
+    """
+    if type(manifold) is str:
+        input_manifold = Manifold(manifold)
+    else:
+        input_manifold = manifold
+
+    if temp_dir:
+        trig_file_dir = temp_dir
+    else:
+        trig_file_dir = tempfile.mkdtemp()
+
+    input_manifold.save(os.path.join(trig_file_dir, 'tmp.trig'))
     snap_process = _kickoff_snap(trig_file_dir)
     try:
         _send_cmd(snap_process, 'set precision 25')
@@ -196,12 +211,12 @@ def _borel_regulator(manifold_name, shape_field_degree):
                         RE_FUNC_REQ_GROUP.match(snap_output),
                         RE_ERROR.match(snap_output),
                         _RE_NO_BOREL.match(snap_output)]):
-                raise Exception('Manifold ' + manifold_name + ' has incalculable Borel regulator')
+                raise Exception('Manifold ' + str(input_manifold) + ' has incalculable Borel regulator')
             else:
                 time.sleep(0.25)
                 wait_count += 1
                 if wait_count > 50:
-                    raise Exception('Manifold ' + manifold_name + ' appears to have hung snap')
+                    raise Exception('Manifold ' + str(input_manifold) + ' appears to have hung snap')
     finally:
         snap_process.terminate()
 

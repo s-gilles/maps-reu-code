@@ -279,7 +279,7 @@ def _compute_shape_fields(idx, temp_file_dir):
                     _snap_process[idx].terminate()
                 except:
                     pass
-                _snap_process[idx] = _kickoff_snap(temp_file_dir, snap_path=snap_path)
+                _snap_process[idx] = _kickoff_snap(temp_file_dir, snap_path = SNAP_PATH)
                 continue
 
         times_retried = 0
@@ -297,7 +297,7 @@ def _compute_shape_fields(idx, temp_file_dir):
                     pass
                 while True:
                     try:
-                        _snap_process[idx] = _kickoff_snap(temp_file_dir, snap_path=snap_path)
+                        _snap_process[idx] = _kickoff_snap(temp_file_dir, snap_path = SNAP_PATH)
                         break
                     except Exception as e:
                         print(str(idx) + ' attempting to recover [' + str(e) + '] ...')

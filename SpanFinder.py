@@ -169,7 +169,7 @@ def _borel_regulator(manifold, shape_field_degree, temp_dir = None):
     """
     Given a manifold (either its name as a string, or a Manifold
     object itself), return, as a list, the volumes (in string form)
-    that make up that volume's Borel regulator. The parameter
+    that make up that manifold's Borel regulator. The parameter
     shape_field_degree is passed directly to snap as by the command
     `set degree'. As it increases, the computations become slower, but
     fewer exceptions are raised.

@@ -699,15 +699,21 @@ class SpanData:
             try:
                 p = str(pari(p).polredabs())
             except: # pari's polredabs fails for some input, depending on version, with no discernable reason. So we do this:
-                print 'When running trace field '+poly+' polredabs couldn\'t handle it.'
+                print 'When running trace field '+str(p)+' polredabs couldn\'t handle it.'
                 p = p   # historical # this behavior on fail is done consistently everywhere
             cand = None     # previous best fit
             subfields = list()
-            for fr in pari(p).nfsubfields()[1:]:
+            try:
+                po = pari(p).nfsubfields()[1:]
+            except: # The pari stack overflows!
+                pari.allocatemem()
+                return _fit(p,rec)
+            for fr in po:
                 try:
                     subfields.append(str(fr[0].polredabs()))
                 except: 
-                    subfields.append(str(fr[0])) 
+                    print 'When running trace field '+str(p)+' polredabs couldn\'t handle subfield '+str(fr[0])+'.'
+                    subfields.append(str(fr[0]))
             for tf in subfields:
                 if not field_filter(*([p,tf]+list(ffilter_args)),**ffilter_kwargs): # test versus provided filter
                     continue                                                        # skip, this field failed

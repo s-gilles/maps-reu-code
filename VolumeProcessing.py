@@ -698,11 +698,17 @@ class SpanData:
         def _fit(p,rec):      # this exists to break multiple layers
             try:
                 p = str(pari(p).polredabs())
-            except: 
+            except: # pari's polredabs fails for some input, depending on version, with no discernable reason. So we do this:
                 print 'When running trace field '+poly+' polredabs couldn\'t handle it.'
-                p = p   # historical
+                p = p   # historical # this behavior on fail is done consistently everywhere
             cand = None     # previous best fit
-            for tf in [str(fr[0].polredabs()) for fr in pari(p).nfsubfields()[1:]]:
+            subfields = list()
+            for fr in pari(p).nfsubfields()[1:]:
+                try:
+                    subfields.append(str(fr[0].polredabs()))
+                except: 
+                    subfields.append(str(fr[0])) 
+            for tf in subfields:
                 if not field_filter(*([p,tf]+list(ffilter_args)),**ffilter_kwargs): # test versus provided filter
                     continue                                                        # skip, this field failed
                 tf = tf.replace(' ','')

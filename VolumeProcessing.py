@@ -799,13 +799,14 @@ class SpanData:
         The format for the combination is:
 
 
-        k1 * exotic_man = k2 * man_1 +- k3 * man_2 +- k4 * man_3...
+        exotic_man = k2/k1 * man_1 +- k3/k1 * man_2 +- k4/k1 * man_3...
 
         where ki are each some nonzero integers (so no if one is
         negative), +- is + or -, exotic_man is Manifold, and the other
         manifolds names stand in for their geometric volumes.
         """
         if type(outfile) == str:
+            f = None
             if append:
                 f = open(outfile,'a')
             else:
@@ -814,20 +815,24 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('Manifold'+separator+'Subfield'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
+                f.write('Manifold'+separator+'Subfield'+separator+'Degree'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
             for m in self.nice_fits.keys():
                 for itf in self.nice_fits[m].keys():
                     for r in self.nice_fits[m][itf].keys():
                         for v in self.nice_fits[m][itf][r].keys():
                             ldp = self.nice_fits[m][itf][r][v]
-                            comb = str(ldp[-1])+'*'+m+'='
+                            comb = ''
                             for n in xrange(len(ldp)-1):
-                                if n != 0 and -1*ldp[n] > 0:  # don't add a plus sign for the first term
+                                if n != 0 and -1*(ldp[n]/ldp[-1]) > 0:  # don't add a plus sign for the first term
                                     comb += '+'
                                 if ldp[n] != 0:
-                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[1][n]
+                                    comb += str(-1*ldp[n])
+                                    if ldp[-1] != 1:
+                                        comb +='/'+str(ldp[-1])
+                                    comb += '*'+self.get_spans(itf,r)[1][n]
                             f.write('"'+m+'"'+separator)
                             f.write('"'+itf+'"'+separator)
+                            f.write('"'+str(pari(itf).poldegree())+'"'+separator)
                             f.write('"'+r+'"'+separator)
                             f.write('"'+v+'"'+separator)
                             f.write('"'+comb+'"\n')
@@ -838,11 +843,12 @@ class SpanData:
                         f.write('"'+str(pari(str(p)).polredabs()).replace(' ','')+'"'+separator)
                     except: # cypari.gen.error or w/e from polredabs failing
                         f.write('"'+str(p).replace(' ','')+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
+                    f.write('"'+str(pari(p).poldegree())+'"'+separator)
                     f.write('"'+'NoneFound'+'"'+separator)
                     f.write('"'+str(rec[0])+'"'+separator)
                     f.write('"'+'None'+'"\n')
         finally:
-            if type(outfile) == str:
+            if f and type(outfile) == str:
                 f.close()
 
 class VolumeData:

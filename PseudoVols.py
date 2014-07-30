@@ -6,7 +6,7 @@ import copy
 from ManifoldIterators import *
 from VolumeUtilities import *
 
-def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, retrieve = True, period = 100, separator = ';'):
+def prepare_pvolume_file(maniter, ofilenm, append = False, engine = 'magma', max_secs = 20, sln = 2, retrieve = True, period = 100, separator = ';'):
     """The same as calling get_volume_data(mans).write_to_csv(ofilenm) with the given parameters,
 except output will be written out every period manifolds and logs generated, instead of all at once."""
 
@@ -26,7 +26,7 @@ except output will be written out every period manifolds and logs generated, ins
                 done = True
             if ctr == period or done:
                 print 'Processing '+str(block[0])+' to '+str(block[-1])+'.' 
-                v = get_volume_data(ForwardingIterator(block.__iter__(),lambda m : str(m)),engine=engine,max_secs=max_secs,retrieve=retrieve)
+                v = get_volume_data(ForwardingIterator(block.__iter__(),lambda m : str(m)),engine=engine,max_secs=max_secs,sln=sln,retrieve=retrieve)
                 v.write_to_csv(f,append=append,separator=separator)
                 append = True  # we must be appending after the first time
                 ctr = 0
@@ -46,7 +46,7 @@ def _distinct_abs(vol_list, epsilon = EPSILON):
             good.append(v)
     return len(good)
 
-def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True, max_itf_degree = MAX_ITF):
+def get_volume_data(man_nms, engine = 'magma', max_secs = 20, retrieve = True, sln = 2, max_itf_degree = MAX_ITF):
     """ Returns a VolumeData object containing exotic volumes for manifolds with the given names
 Volumes' precision is based on pari, so set it there
 set retrieve = False to skip retrieving ptolemy data from files
@@ -67,7 +67,7 @@ Set to None and it will be ignored."""
     for nm in man_nms:
         try:
             sols = None
-            var = Manifold(nm).ptolemy_variety(2,'all')
+            var = Manifold(nm).ptolemy_variety(sln,'all')
             try:
                 if retrieve:
                     sols = var.retrieve_solutions()
@@ -117,6 +117,13 @@ def get_potential_trace_fields(poly):
             print 'When running trace field '+poly+' polredabs couldn\'t handle it.'
             return [poly]   # between this return and the above print statement, we should know when the above error happened.
         return get_potential_trace_fields(str(pol))
+
+def is_pitf(poly,cand):
+    pol = pari(poly)
+    cand = pari(cand)
+    small = cand.poldegree()
+    large = pol.poldegree()
+    return _binmiss(small,large)
 
 def _binmiss(s,l):
     while s < l:

@@ -105,31 +105,30 @@ Set to None and it will be ignored."""
             recs[p][v] = list(set(recs[p][v]))
     return VolumeData(data = recs)
 
-def get_potential_trace_fields(poly):
+def get_potential_trace_fields(poly,sln=2):
     """Given a minimal polynomial of a trace field, returns a list of minimal polynomials of the potential invariant trace fields."""
     pol = pari(poly)
     try:
-        return [str(rec[0].polredabs()) for rec in pol.nfsubfields()[1:] if _binmiss(rec[0].poldegree(),pol.poldegree())]   # poldegree returns int
+        return [str(rec[0].polredabs()) for rec in pol.nfsubfields()[1:] if _knmiss(rec[0].poldegree(),pol.poldegree(),sln=sln)]    # poldegree returns int
     except: # we want cypari.gen.PariError, but no idea how to reference; fortunately, anything else will just raise again
         try:
             pol = pol.polredabs()
         except: # actually except PariError again
             print 'When running trace field '+poly+' polredabs couldn\'t handle it.'
             return [poly]   # between this return and the above print statement, we should know when the above error happened.
-        return get_potential_trace_fields(str(pol))
+        return get_potential_trace_fields(str(pol),sln=sln)
 
-def is_pitf(poly,cand):
+def is_pitf(poly,cand,sln=2):
     pol = pari(poly)
     cand = pari(cand)
     small = cand.poldegree()
     large = pol.poldegree()
-    return _binmiss(small,large)
+    return _knmiss(small,large,sln)
 
-def _binmiss(s,l):
+def _knmiss(s,l,n):
     while s < l:
-        s *= 2
-    return s == l
-    
+        s *= n
+    return s == l   
 
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
@@ -187,13 +186,13 @@ It's usually not nescecary to make these yourself; collection and read methods r
             if type(output_file) == str and f:
                 f.close()
 
-    def filter_fields(self, maxsfdegree=MAX_ITF):
+    def filter_fields(self, maxsfdegree=MAX_ITF, sln = 2):
         """This filter removes some polynomials with no subfields of degree <= maxsfdegree
         it doesn't get them all, but does avoid calling nfsubfields; it is quick and approximate."""
         def _filter(p): # for a double break
             deg = pari(p).poldegree()
             for n in xrange(maxsfdegree):
-                if _binmiss(n+1,deg):
+                if _knmiss(n+1,deg,sln=sln):
                     return
             del self.data[p]
         for p in self.data.keys():

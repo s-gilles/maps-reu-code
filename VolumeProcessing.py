@@ -608,7 +608,7 @@ class SpanData:
         """
         If fitted, gives a dictionary chain.  The key progression of this chain is
 
-        manifold name
+        (manifold name,trace field)
           invariant trace field
             root
               volume
@@ -728,7 +728,7 @@ class SpanData:
                             if abs(ldp[-1]) == 1:    # the match was perfect, update the data
                                 _fresz(tf,r)
                                 self.data[tf][r][3].append(rec)
-                                self.nice_fits.setdefault(rec[1],dict()).setdefault(tf,dict()).setdefault(r,dict())[rec[0]] = ldp
+                                self.nice_fits.setdefault((rec[1],str(p)),dict()).setdefault(tf,dict()).setdefault(r,dict())[rec[0]] = ldp
                                 return
                             else:   # the match was imperfect, maybe a better fit awaits
                                 if not cand or cand[1][-1] > ldp[-1]:   # better than previous best fit
@@ -827,12 +827,14 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('Manifold'+separator+'Subfield'+separator+'Degree'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
-            for m in self.nice_fits.keys():
-                for itf in self.nice_fits[m].keys():
-                    for r in self.nice_fits[m][itf].keys():
-                        for v in self.nice_fits[m][itf][r].keys():
-                            ldp = self.nice_fits[m][itf][r][v]
+                f.write('Manifold'+separator+'TraceField'+separator+'Subfield'+separator+'Degree'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
+            for mr in self.nice_fits.keys():
+                for itf in self.nice_fits[mr].keys():
+                    for r in self.nice_fits[mr][itf].keys():
+                        for v in self.nice_fits[mr][itf][r].keys():
+                            m = mr[0]
+                            tf = mr[1]
+                            ldp = self.nice_fits[mr][itf][r][v]
                             comb = ''
                             for n in xrange(len(ldp)-1):
                                 if n != 0 and -1*(ldp[n]/ldp[-1]) > 0:  # don't add a plus sign for the first term
@@ -843,6 +845,7 @@ class SpanData:
                                         comb +='/'+str(ldp[-1])
                                     comb += '*'+self.get_spans(itf,r)[1][n]
                             f.write('"'+m+'"'+separator)
+                            f.write('"'+tf.replace(' ','')+'"'+separator)
                             f.write('"'+itf+'"'+separator)
                             f.write('"'+str(pari(itf).poldegree())+'"'+separator)
                             f.write('"'+r+'"'+separator)
@@ -852,9 +855,13 @@ class SpanData:
                 for rec in self.fit_fails[p]:
                     f.write('"'+str(rec[1])+'"'+separator)
                     try:
-                        f.write('"'+str(pari(str(p)).polredabs()).replace(' ','')+'"'+separator)
+                        fld = '"'+str(pari(str(p)).polredabs()).replace(' ','')+'"'+separator
+                        f.write(fld)    # trace field
+                        f.write(fld)    # itf
                     except: # cypari.gen.error or w/e from polredabs failing
-                        f.write('"'+str(p).replace(' ','')+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
+                        fld = '"'+str(p).replace(' ','')+'"'+separator  # be consistent with get_potential_trace_field fail behaviour
+                        f.write(fld)
+                        f.write('"NoneFound;PolredabsBug"'+separator)   # warn the user more explicitly
                     f.write('"'+str(pari(p).poldegree())+'"'+separator)
                     f.write('"'+'NoneFound'+'"'+separator)
                     f.write('"'+str(rec[0])+'"'+separator)

@@ -5,7 +5,7 @@ import traceback
 import fractions
 
 from SpanFinder import find_span, find_borel_matrix
-from PseudoVols import VolumeData, get_potential_trace_fields
+from PseudoVols import VolumeData, is_pitf
 from VolumeUtilities import *
 from cypari import *
 from fractions import Fraction
@@ -608,7 +608,7 @@ class SpanData:
         """
         If fitted, gives a dictionary chain.  The key progression of this chain is
 
-        manifold name
+        (manifold name,trace field)
           invariant trace field
             root
               volume
@@ -669,11 +669,26 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = MAX_LDP_TRIES, max_itf_degree = MAX_ITF):
+    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = MAX_LDP_TRIES, field_filter = is_pitf, ffilter_args = list(), ffilter_kwargs = dict()):
         """
         Given a VolumeData object (from PseudoVols) representing some exotic volumes, this method attempts to see if we can generate them
         as linear combinations of the volumes in the spans. After calling this, you can write out the fits with write_nice_fits, and
         if you write out the SpanData object, data on the fits will be included.
+
+        maxcoeff and max_ldp_tries determine the maximum coefficents and tries (respectively) for PARI's lindep.
+
+        field_filter is a function which accepts as its first argument the string representing a pseudo-volume's trace field and it's second argument a potential subfield thereof and returns as a boolean telling us 
+        whether to bother checking that subfield. It will be run against all subfields of the trace field.
+        So for example, to just check all subfields, 
+        def true(p):
+            return True
+        foo.fit(....... field_filter = true)
+
+        ffilter_args sets additional arguments for the filter;
+        ffilter_kwargs is a dictionary containing the optional arguments to field_filter
+        So, the call within fit will be field_filter(*([poly,subfield]+list(ffilter_args)),**ffilter_kwargs)
+
+        This modularity is intended to make investigation of variants of Neuman's conjecture easier. By default, we only check potential invariant trace fields.
 
         When this code is run, you will get a lot of "***   polynomial not in Z[X] in galoisinit." printed out; don't worry, that's normal.
         """
@@ -681,8 +696,27 @@ class SpanData:
             if len(self.data[p][r]) == 3:
                 self.data[p][r].extend([list(),0,list()])
         def _fit(p,rec):      # this exists to break multiple layers
+            try:
+                p = str(pari(p).polredabs())
+            except: # pari's polredabs fails for some input, depending on version, with no discernable reason. So we do this:
+                print 'When running trace field '+str(p)+' polredabs couldn\'t handle it.'
+                p = p   # historical # this behavior on fail is done consistently everywhere
             cand = None     # previous best fit
-            for tf in get_potential_trace_fields(p):
+            subfields = list()
+            try:
+                po = pari(p).nfsubfields()[1:]
+            except: # The pari stack overflows!
+                pari.allocatemem()
+                return _fit(p,rec)
+            for fr in po:
+                try:
+                    subfields.append(str(fr[0].polredabs()))
+                except: 
+                    print 'When running trace field '+str(p)+' polredabs couldn\'t handle subfield '+str(fr[0])+'.'
+                    subfields.append(str(fr[0]))
+            for tf in subfields:
+                if not field_filter(*([p,tf]+list(ffilter_args)),**ffilter_kwargs): # test versus provided filter
+                    continue                                                        # skip, this field failed
                 tf = tf.replace(' ','')
                 if tf in self.get_polys():
                     for r in self.get_roots(tf):
@@ -694,7 +728,7 @@ class SpanData:
                             if abs(ldp[-1]) == 1:    # the match was perfect, update the data
                                 _fresz(tf,r)
                                 self.data[tf][r][3].append(rec)
-                                self.nice_fits.setdefault(rec[1],dict()).setdefault(tf,dict()).setdefault(r,dict())[rec[0]] = ldp
+                                self.nice_fits.setdefault((rec[1],str(p)),dict()).setdefault(tf,dict()).setdefault(r,dict())[rec[0]] = ldp
                                 return
                             else:   # the match was imperfect, maybe a better fit awaits
                                 if not cand or cand[1][-1] > ldp[-1]:   # better than previous best fit
@@ -711,8 +745,8 @@ class SpanData:
                 self.fit_fails = dict()
         for p in voldata.get_polys():
             for v in voldata.get_volumes(p):
-                for m in voldata.get_manifolds(p,v):
-                    _fit(p,(v,m))   # TODO fix this innefficent implementation (much redundnacy; should be once / v)
+                for mrec in voldata.data[p][v]:
+                    _fit(p,(v,mrec[0],mrec[1]))   # TODO fix this innefficent implementation (much redundnacy; should be once / v)
         for p in self.get_polys():      # got to recalc psuedo fit ratios
             for r in self.get_roots(p):
                 if len(self.data[p][r]) == 6:    # only operate if pseudo volumes in play
@@ -746,6 +780,7 @@ class SpanData:
     def write_failures(self, outfile, separator = ';', append = False):
         """
         Write the fit failures (see get_fit_failures) out to outfile as a csv
+        Noteably, this is a valid VolumeData output, and can be read in as such.
         """
         if type(outfile) == str:
             if append:
@@ -756,12 +791,13 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('TraceField' + separator + 'Volume' + separator + 'Manifold\n')
+                f.write('TraceField' + separator + 'Volume' + separator + 'Manifold' + separator + 'ObstructionIndex\n')
             for p in self.fit_fails.keys(): # was this working without keys?
                 for rec in self.fit_fails[p]:
                     f.write('"'+str(p)+'"'+separator)
                     f.write('"'+str(rec[0])+'"'+separator)
-                    f.write('"'+str(rec[1])+'"\n')
+                    f.write('"'+str(rec[1])+'"'+separator)
+                    f.write('"'+str(rec[2])+'"\n')
         finally:
             if type(outfile) == str:
                 f.close()
@@ -775,13 +811,14 @@ class SpanData:
         The format for the combination is:
 
 
-        k1 * exotic_man = k2 * man_1 +- k3 * man_2 +- k4 * man_3...
+        exotic_man = k2/k1 * man_1 +- k3/k1 * man_2 +- k4/k1 * man_3...
 
         where ki are each some nonzero integers (so no if one is
         negative), +- is + or -, exotic_man is Manifold, and the other
         manifolds names stand in for their geometric volumes.
         """
         if type(outfile) == str:
+            f = None
             if append:
                 f = open(outfile,'a')
             else:
@@ -790,20 +827,27 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('Manifold'+separator+'Subfield'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
-            for m in self.nice_fits.keys():
-                for itf in self.nice_fits[m].keys():
-                    for r in self.nice_fits[m][itf].keys():
-                        for v in self.nice_fits[m][itf][r].keys():
-                            ldp = self.nice_fits[m][itf][r][v]
-                            comb = str(ldp[-1])+'*'+m+'='
+                f.write('Manifold'+separator+'TraceField'+separator+'Subfield'+separator+'Degree'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
+            for mr in self.nice_fits.keys():
+                for itf in self.nice_fits[mr].keys():
+                    for r in self.nice_fits[mr][itf].keys():
+                        for v in self.nice_fits[mr][itf][r].keys():
+                            m = mr[0]
+                            tf = mr[1]
+                            ldp = self.nice_fits[mr][itf][r][v]
+                            comb = ''
                             for n in xrange(len(ldp)-1):
-                                if n != 0 and -1*ldp[n] > 0:  # don't add a plus sign for the first term
+                                if n != 0 and -1*(ldp[n]/ldp[-1]) > 0:  # don't add a plus sign for the first term
                                     comb += '+'
                                 if ldp[n] != 0:
-                                    comb += str(-1*ldp[n])+'*'+self.get_spans(itf,r)[1][n]
+                                    comb += str(-1*ldp[n])
+                                    if ldp[-1] != 1:
+                                        comb +='/'+str(ldp[-1])
+                                    comb += '*'+self.get_spans(itf,r)[1][n]
                             f.write('"'+m+'"'+separator)
+                            f.write('"'+tf.replace(' ','')+'"'+separator)
                             f.write('"'+itf+'"'+separator)
+                            f.write('"'+str(pari(itf).poldegree())+'"'+separator)
                             f.write('"'+r+'"'+separator)
                             f.write('"'+v+'"'+separator)
                             f.write('"'+comb+'"\n')
@@ -811,14 +855,19 @@ class SpanData:
                 for rec in self.fit_fails[p]:
                     f.write('"'+str(rec[1])+'"'+separator)
                     try:
-                        f.write('"'+str(pari(str(p)).polredabs()).replace(' ','')+'"'+separator)
+                        fld = '"'+str(pari(str(p)).polredabs()).replace(' ','')+'"'+separator
+                        f.write(fld)    # trace field
+                        f.write(fld)    # itf
                     except: # cypari.gen.error or w/e from polredabs failing
-                        f.write('"'+str(p).replace(' ','')+'"'+separator)   # be consistent with get_potential_trace_field fail behaviour
+                        fld = '"'+str(p).replace(' ','')+'"'+separator  # be consistent with get_potential_trace_field fail behaviour
+                        f.write(fld)
+                        f.write('"NoneFound;PolredabsBug"'+separator)   # warn the user more explicitly
+                    f.write('"'+str(pari(p).poldegree())+'"'+separator)
                     f.write('"'+'NoneFound'+'"'+separator)
                     f.write('"'+str(rec[0])+'"'+separator)
                     f.write('"'+'None'+'"\n')
         finally:
-            if type(outfile) == str:
+            if f and type(outfile) == str:
                 f.close()
 
 class VolumeData:

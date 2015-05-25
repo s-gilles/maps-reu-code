@@ -1293,7 +1293,7 @@ def _gcd(fracts):
         nums = fractions.gcd(num,n) # our numerator should be gcd of input (same denom) numerators
     return Fraction(numerator = num, denominator = denom)
 
-def get_all_volumes(m_name, engine = None):
+def get_all_volumes(m_name, engine = None, n = 2):
     """
     Given the name of a manifold (as a string), returns the a list of
     [the real part of] each complex volume that is a solution of the
@@ -1302,12 +1302,12 @@ def get_all_volumes(m_name, engine = None):
     """
     m = Manifold(m_name)
     try:
-        v = m.ptolemy_variety(2,'all').retrieve_solutions(numerical = True)
+        v = m.ptolemy_variety(n,'all').retrieve_solutions(numerical = True)
     except: # HERE restrict to right exception type
         if engine == None:
-            v = m.ptolemy_variety(2,'all').compute_solutions(numerical = True)
+            v = m.ptolemy_variety(n,'all').compute_solutions(numerical = True)
         else:
-            v = m.ptolemy_variety(2,'all').compute_solutions(numerical = True, engine = engine)
+            v = m.ptolemy_variety(n,'all').compute_solutions(numerical = True, engine = engine)
     return list([str(g.real()) for g in [x for s in v.complex_volume_numerical() for x in s][0]]) # Structural monstrosity, sorry.
 
 # Test code

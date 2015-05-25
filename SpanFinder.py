@@ -11,6 +11,7 @@ from VolumeFinder import RE_INV_TRACE_FIELD_NOT_FOUND, RE_FUNC_REQ_GROUP, RE_ERR
 
 _RE_NO_BOREL = re.compile('.*Borel Regulator: not computed.*', re.DOTALL)
 _RE_BOREL_REGULATOR = re.compile('.*Borel Regulator: \[([-0-9.,]*)\].*', re.DOTALL)
+_RE_BAD_GENERATOR = re.compile('.*Non existent generator.*', re.DOTALL)
 
 def find_span(elts, n, cutoff = 4096):
     """
@@ -210,6 +211,7 @@ def _borel_regulator(manifold, shape_field_degree, temp_dir = None):
             elif any([RE_INV_TRACE_FIELD_NOT_FOUND.match(snap_output),
                         RE_FUNC_REQ_GROUP.match(snap_output),
                         RE_ERROR.match(snap_output),
+                        _RE_BAD_GENERATOR.match(snap_output),
                         _RE_NO_BOREL.match(snap_output)]):
                 raise Exception('Manifold ' + str(input_manifold) + ' has incalculable Borel regulator')
             else:

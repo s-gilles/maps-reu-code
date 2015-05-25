@@ -2,7 +2,7 @@ from snappy import *
 from math import log
 
 # Global constants:
-PARI_PRECISION = 100
+PARI_PRECISION = 500
 LINDEP_PRECISION = 16
 EPSILON = 1e-12
 MAX_ITF = 8

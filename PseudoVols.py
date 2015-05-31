@@ -165,6 +165,7 @@ It's usually not nescecary to make these yourself; collection and read methods r
     # given an (open, ready to write) file object or valid filename, writes the data
     def write_to_csv(self, output_file, separator = ';', append = False):
         """Writes out the data to output_file, provided output_file is a valid (open, ready to write) File object or filename."""
+        f = None
         try:
             if type(output_file) == str:
                 if append:

@@ -70,9 +70,9 @@ Set to None and it will be ignored."""
             var = Manifold(nm).ptolemy_variety(sln,'all')
             try:
                 if retrieve:
-                    sols = var.retrieve_solutions()
+                    sols = var.retrieve_decomposition()
                 else:
-                    raise Exception('Coding too lazy!') 
+                    raise Exception("Go on and compute")
             except Exception as e: # try using engine
                 if engine:
                     mine, theirs = Pipe(duplex = False)
@@ -90,7 +90,7 @@ Set to None and it will be ignored."""
                     print 'No engine and no data retrieved; skipping '+nm
                     continue
             if sols:
-                data = [(c.number_field(),c.volume_numerical()) for c in sols.flatten()]
+                data = [(c.number_field(),c.solutions(numerical = True).volume_numerical()) for c in sols.flatten()]
                 for cl_idx in xrange(len(data)):
                     if data[cl_idx]: # TODO may be trivial since no check here
                         for v in data[cl_idx][1]:
@@ -193,7 +193,7 @@ It's usually not nescecary to make these yourself; collection and read methods r
         def _filter(p): # for a double break
             deg = pari(p).poldegree()
             for n in xrange(maxsfdegree):
-                if _knmiss(n+1,deg,sln=sln):
+                if _knmiss(n+1, deg, sln):
                     return
             del self.data[p]
         for p in self.data.keys():

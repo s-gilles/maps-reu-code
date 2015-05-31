@@ -165,6 +165,7 @@ It's usually not nescecary to make these yourself; collection and read methods r
     # given an (open, ready to write) file object or valid filename, writes the data
     def write_to_csv(self, output_file, separator = ';', append = False):
         """Writes out the data to output_file, provided output_file is a valid (open, ready to write) File object or filename."""
+        f = None
         try:
             if type(output_file) == str:
                 if append:
@@ -271,6 +272,7 @@ def is_int(fl, epsilon = EPSILON):
 
 def read_volumedata_csv(infile, separator = ';'):
     """Given an (open, ready to read data) file object or valid filename, reads the file and returns a VolumeData that would write it."""
+    f = None
     try:
         if type(infile) ==  str:
             f = open(infile,'r')

@@ -1135,6 +1135,8 @@ def read_csv(in_file, separator = ';', sub_separator = '|'):
             w = re.findall('"([^"]*)"', l)
         else:
             w = l.replace('\n','').replace('"','').split(separator)
+        if len(w) < 2:
+            continue
         if len(w) == 10:    # pared manifolds weren't supported when this csv was written out
             w.append('')    # acceptable substitute
         vol_entry = data.setdefault(w[1],[dict(),w[5]])[0].setdefault(w[2],dict()).setdefault(w[4],[list(),list()])

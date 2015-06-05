@@ -1,4 +1,8 @@
 *.pyc
+*.csv
+*.swp
+*.bak
+lxfits
 *~
 test*py
 *#*

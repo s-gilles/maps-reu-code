@@ -1,7 +1,9 @@
 from snappy import Manifold
 from cypari import *
 from multiprocessing import *
+
 import copy
+import sys
 
 from ManifoldIterators import *
 from VolumeUtilities import *
@@ -118,7 +120,7 @@ def get_potential_trace_fields(poly,sln=2):
             return [poly]   # between this return and the above print statement, we should know when the above error happened.
         return get_potential_trace_fields(str(pol),sln=sln)
 
-def is_pitf(poly,cand,sln=2):
+def is_pitf(poly,cand,sln):
     pol = pari(poly)
     cand = pari(cand)
     small = cand.poldegree()
@@ -126,9 +128,11 @@ def is_pitf(poly,cand,sln=2):
     return _knmiss(small,large,sln)
 
 def _knmiss(s,l,n):
+    if s <= 0 or l <= 0 or n <= 0:
+        return False
     while s < l:
         s *= n
-    return s == l   
+    return s == l
 
 # Wrapper for manipulating data on pseudo-volumes
 class VolumeData:
@@ -253,11 +257,11 @@ It's usually not nescecary to make these yourself; collection and read methods r
                 for p,v in classes[rec]:
                     self.data[p][v].remove(rec)
 
-    def clean(self, maxsfdegree = MAX_ITF, epsilon = EPSILON):
+    def clean(self, maxsfdegree = MAX_ITF, epsilon = EPSILON, n=2):
         """Runs several methods for decreasing size without losing much information
         Set maxsfdegree to None to avoid culling based on subfield degree."""
         if maxsfdegree:
-            self.filter_fields(maxsfdegree = maxsfdegree)
+            self.filter_fields(maxsfdegree = maxsfdegree, sln = n)
             self.filter_distinct_volumes(maxsfdegree = maxsfdegree, epsilon = epsilon)
         self.remove_nonpositive_vols(epsilon = epsilon)
 

@@ -1,4 +1,5 @@
 import copy
+import datetime
 import re
 import sys
 import traceback
@@ -669,28 +670,32 @@ class SpanData:
             if type(outfile) == str:
                 f.close()
 
-    def fit(self, voldata, maxcoeff = MAX_COEFF, max_ldp_tries = MAX_LDP_TRIES, field_filter = is_pitf, ffilter_args = list(), ffilter_kwargs = dict()):
-        """
-        Given a VolumeData object (from PseudoVols) representing some exotic volumes, this method attempts to see if we can generate them
+    def fit(self, voldata, n=2, maxcoeff = MAX_COEFF, max_ldp_tries = MAX_LDP_TRIES, field_filter = lambda x,y,z:True, ffilter_args = list(), ffilter_kwargs = dict()):
+        """Given a VolumeData object (from PseudoVols) representing some exotic volumes, this method attempts to see if we can generate them
         as linear combinations of the volumes in the spans. After calling this, you can write out the fits with write_nice_fits, and
         if you write out the SpanData object, data on the fits will be included.
 
         maxcoeff and max_ldp_tries determine the maximum coefficents and tries (respectively) for PARI's lindep.
 
-        field_filter is a function which accepts as its first argument the string representing a pseudo-volume's trace field and it's second argument a potential subfield thereof and returns as a boolean telling us 
+        n represents that we are concerned with representations into PSL(n,C)
+
+        field_filter is a function which accepts as its first argument the string representing a pseudo-volume's trace field, as it's second argument a potential subfield, and as its third argument n, and returns as a boolean telling us
         whether to bother checking that subfield. It will be run against all subfields of the trace field.
-        So for example, to just check all subfields, 
+        So for example, to just check all subfields,
         def true(p):
             return True
         foo.fit(....... field_filter = true)
 
+        This is the default.
+
         ffilter_args sets additional arguments for the filter;
         ffilter_kwargs is a dictionary containing the optional arguments to field_filter
-        So, the call within fit will be field_filter(*([poly,subfield]+list(ffilter_args)),**ffilter_kwargs)
+        So, the call within fit will be field_filter(*([poly,subfield, n]+list(ffilter_args)),sln=n,**ffilter_kwargs)
 
         This modularity is intended to make investigation of variants of Neuman's conjecture easier. By default, we only check potential invariant trace fields.
 
         When this code is run, you will get a lot of "***   polynomial not in Z[X] in galoisinit." printed out; don't worry, that's normal.
+
         """
         def _fresz(p,r):    # if not already done, change data[p][r] to bigger format
             if len(self.data[p][r]) == 3:
@@ -711,11 +716,11 @@ class SpanData:
             for fr in po:
                 try:
                     subfields.append(str(fr[0].polredabs()))
-                except: 
+                except:
                     print 'When running trace field '+str(p)+' polredabs couldn\'t handle subfield '+str(fr[0])+'.'
                     subfields.append(str(fr[0]))
             for tf in subfields:
-                if not field_filter(*([p,tf]+list(ffilter_args)),**ffilter_kwargs): # test versus provided filter
+                if not field_filter(*([p,tf,n]+list(ffilter_args)),**ffilter_kwargs): # test versus provided filter
                     continue                                                        # skip, this field failed
                 tf = tf.replace(' ','')
                 if tf in self.get_polys():
@@ -827,13 +832,15 @@ class SpanData:
             f = outfile
         try:
             if not append:
-                f.write('Manifold'+separator+'TraceField'+separator+'Subfield'+separator+'Degree'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
+                f.write('Manifold'+separator+'TraceField'+separator+'TraceFieldDegree'+'Subfield'+separator+'SubfieldDegree'+separator+'Root'+separator+'Volume'+separator+'LinearCombination\n')
             for mr in self.nice_fits.keys():
                 for itf in self.nice_fits[mr].keys():
                     for r in self.nice_fits[mr][itf].keys():
                         for v in self.nice_fits[mr][itf][r].keys():
                             m = mr[0]
                             tf = mr[1]
+                            if tf == '^':
+                                continue
                             ldp = self.nice_fits[mr][itf][r][v]
                             comb = ''
                             for n in xrange(len(ldp)-1):
@@ -846,6 +853,7 @@ class SpanData:
                                     comb += '*'+self.get_spans(itf,r)[1][n]
                             f.write('"'+m+'"'+separator)
                             f.write('"'+tf.replace(' ','')+'"'+separator)
+                            f.write('"'+str(pari(tf.replace(' ','')).poldegree())+'"'+separator)
                             f.write('"'+itf+'"'+separator)
                             f.write('"'+str(pari(itf).poldegree())+'"'+separator)
                             f.write('"'+r+'"'+separator)

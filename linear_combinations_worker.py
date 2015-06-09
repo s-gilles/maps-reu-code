@@ -4,8 +4,10 @@ from __future__ import print_function
 
 import argparse
 import errno
+import fractions
 import csv
 import sys
+import os
 
 from snappy import *
 
@@ -23,6 +25,9 @@ LCC_ENCOUNTERED_ERROR = 'LCC_encountered_an_error'
 LCC_REFUSE_TO_CLOBBER = 'LCC_output_file_exists_and_is_not_what_was_expected'
 LCC_CANT_DEAL_WITH_OUTPUT_FILE = 'LCC_output_file_cannot_be_gracefully_dealt_with'
 LCC_HEADER = 'Manifold;TraceField;TraceFieldDegree;Subfield;SubfieldDegree;Root;Volume;LinearCombination'
+
+MAX_COEFF = 4096
+MAX_LINDEP_TRIES = 50
 
 class Span:
 
@@ -90,12 +95,12 @@ all_spans = []
 """A list of every span read in.  Dunno why"""
 
 span_dict = dict()
-"""A lookup of spans by polynomial, then root"""
+"""A lookup of spans by polynomial"""
 
 output_filename = None
 """Where to write out data"""
 
-n = 2
+n_in_SLnC = 2
 """Which SL(n,C) to consider representations into"""
 
 lindep_precision = 16
@@ -104,32 +109,94 @@ lindep_precision = 16
 epsilon_string = '1E-500'
 """Very small number for use in volume culling"""
 
-def nfsubfields(polynomial):
+def get_nfsubfields(polynomial):
     done = False
     nfsubfields_output = []
     polredabs_output = None
     while True:
         try:
             if not polredabs_output:
-                polredabs_output = pari(polynomial).polredabs()
-            nfsubfields_output = polredabs_output.nfsubfields()[1:]
+                try:
+                    polredabs_output = pari(polynomial).polredabs()
+                except:
+                    polredabs_output = pari(polynomial)
+                print(LCC_MAKING_PROGRESS)
+                sys.stdout.flush()
+                nfsubfields_output = polredabs_output.nfsubfields()[1:]
             break
         except:
             pari.allocatemem()
 
-    return nfsubfields_output
+    nfsubfields_output = [ str(x[0]) for x in nfsubfields_output
+                           if len(str(x[0])) > 2]
+    print(LCC_MAKING_PROGRESS)
+    sys.stdout.flush()
+    reduced = list()
+    for subfield in nfsubfields_output:
+        while True:
+            try:
+                reduced.append(str(pari(subfield).polredabs()))
+                print(LCC_MAKING_PROGRESS)
+                sys.stdout.flush()
+                break
+            except:
+                pari.allocatemem()
+    reduced = [ s.replace(' ', '') for s in reduced ]
+    return reduced
+
+def get_pari_lindep(str_vols,
+                    maxcoeff = MAX_COEFF,
+                    max_tries = MAX_LINDEP_TRIES):
+    """Given str_volumes, a list of volumes in string form, returns the
+    dependancy found (if any) as a list of integers if all coefficents
+    are <= maxcoeff or maxcoeff is nonpositive; otherwise, it returns
+    []
+
+    """
+    vols = list(str_vols)   # in case someone sent some other type collection
+    vec = None
+
+    num_tries = 0
+    while not vec and num_tries < max_tries:
+        vec = str(pari(str(vols).replace("\'",'')).lindep(lindep_precision))[1:-2].replace(' ','').split(',')
+        num_tries += 1
+
+    if not vec or vec == ['']: # no input
+        print(LCC_ENCOUNTERED_ERROR)
+        sys.stdout.flush()
+        return list()
+
+    o = [int(v) for v in vec]
+    if len(o) >= 1 and o[-1] < 0:
+        o = [-1 * element for element in o]
+    if maxcoeff > 0:
+        for x in o:
+            if abs(x) > maxcoeff:
+                return list()
+                break
+    return o
 
 def handle_manifold(a_string):
     m = Manifold(a_string)
-    pv = m.ptolemy_variety(n, 'all')
-    decompositions = pv.retrieve_decomposition()
+    pv = m.ptolemy_variety(n_in_SLnC, 'all')
+    decompositions = None
+    try:
+        decompositions = pv.retrieve_decomposition()
+    except:
+        print(LCC_ENCOUNTERED_ERROR)
+        sys.stdout.flush()
+        return
     subfields = None
+    spans_for_polynomial = None
 
     for decomposition in decompositions:
         obstruction_class = -1
+        spans_for_polynomial = None
         for s in decomposition:
             obstruction_class = obstruction_class + 1
-            polynomial = s.number_field().replace(' ', '')
+            polynomial = str(s.number_field()).replace(' ', '')
+            subfields = None
+            spans_for_polynomial = None
             volumes = s.solutions(numerical = True).volume_numerical()
             if not volumes:
                 volumes = []
@@ -145,14 +212,74 @@ def handle_manifold(a_string):
                               if pari(v+'>'+epsilon_string) ])
             distinct_volumes = list()
             for v in positives:
-                matches = [ u for u in good if pari(str(v)+'-'+str(u)+'<='+epsilon_string) ]
+                matches = [ u for u in distinct_volumes if pari(str(v)+'-'+str(u)+'<='+epsilon_string) ]
                 if not matches:
                     distinct_volumes.append(v)
             if len(distinct_volumes) > 4:
                 continue
 
-            # Now we need to do something....
+            # Now we need to get the possible subfields. This is the
+            # most intensive part.
+            if not subfields:
+                subfields = get_nfsubfields(polynomial)
+                print(LCC_MAKING_PROGRESS)
+                sys.stdout.flush()
 
+            for subfield in subfields:
+                # For every root of the polynomial, try and fit the data
+                # into the span
+                if not spans_for_polynomial:
+                    spans_for_polynomial = span_dict.setdefault(subfield, list())
+
+                for volume in distinct_volumes:
+                    smallest_fit = -1
+                    best_span = None
+                    ldp = []
+
+                    # Check all spans to get the one with the best fit
+                    # ratio for this volume
+                    for span in spans_for_polynomial:
+                        ldp = get_pari_lindep(span.volume_span + [ volume ])
+                        if not ldp or ldp[-1] == 0:
+                            continue
+                        if smallest_fit < 0 or ldp[-1] < smallest_fit:
+                            smallest_fit = ldp[-1]
+                            best_span = span
+                        if ldp[-1] == 1:
+                            break
+
+                    # Note we lie a little here because we want to
+                    # make sure that we aren't killed while writing
+                    # the output
+                    print(LCC_MAKING_PROGRESS)
+                    sys.stdout.flush()
+
+                    if not ldp or ldp[-1] == 0:
+                        continue
+
+                    linear_comb_str = ''
+                    for n in xrange(len(ldp)-1):
+                        if ldp[n] == 0:
+                            continue
+                        if linear_comb_str != '' and ldp[n] < 0:
+                            linear_comb_str += ' + '
+                        linear_comb_str += str(fractions.Fraction(-1 * ldp[n], ldp[-1])).replace('-', ' - ')
+                        linear_comb_str += '*'
+                        linear_comb_str += best_span.manifold_span[n]
+
+                    with open(output_filename, 'ab') as output_file:
+                        csvwriter = csv.writer(output_file,
+                                               delimiter = ';',
+                                               quoting = csv.QUOTE_ALL,
+                                               lineterminator = os.linesep)
+                        csvwriter.writerow([str(m),
+                                            str(polynomial),
+                                            str(pari(polynomial).poldegree()),
+                                            str(subfield),
+                                            str(pari(subfield).poldegree()),
+                                            str(best_span.root),
+                                            str(volume),
+                                            linear_comb_str.strip()])
 
 if __name__ == '__main__':
 
@@ -177,7 +304,7 @@ if __name__ == '__main__':
                             help = 'Precision to use when calling lindep()')
     args = arg_parser.parse_args()
     output_filename = args.output
-    n = args.n
+    n_in_SLnC = args.n
     if args.precision < 20:
         args.precision = 20
     pari.set_real_precision(args.precision)
@@ -197,15 +324,18 @@ if __name__ == '__main__':
                     has_header = True
                 else:
                     print(LCC_REFUSE_TO_CLOBBER)
+                    sys.stdout.flush()
                     must_abort = True
     except IOError as e:
         if e.errno == errno.ENOENT:
             pass
         else:
             print(LCC_CANT_DEAL_WITH_OUTPUT_FILE)
+            sys.stdout.flush()
             must_abort = True
     except:
         print(LCC_CANT_DEAL_WITH_OUTPUT_FILE)
+        sys.stdout.flush()
         must_abort = True
 
     if must_abort:
@@ -227,13 +357,14 @@ if __name__ == '__main__':
             new_span = Span(*row)
             all_spans.append(Span(*row))
 
-            by_dict = span_dict.setdefault(new_span.polynomial, dict())
-            by_root = by_dict.setdefault(new_span.root, list())
-            by_root.append(new_span)
+            spans_for_poly = span_dict.setdefault(new_span.polynomial, list())
+            spans_for_poly.append(new_span)
 
 
     print(LCC_READY_TO_RECEIVE_DATA_STRINGS)
+    sys.stdout.flush()
 
     while True:
         handle_manifold(sys.stdin.readline())
         print(LCC_WANT_MORE_DATA)
+        sys.stdout.flush()

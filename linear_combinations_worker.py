@@ -228,8 +228,7 @@ def handle_manifold(a_string):
             for subfield in subfields:
                 # For every root of the polynomial, try and fit the data
                 # into the span
-                if not spans_for_polynomial:
-                    spans_for_polynomial = span_dict.setdefault(subfield, list())
+                spans_for_polynomial = span_dict.setdefault(subfield, list())
 
                 for volume in distinct_volumes:
                     smallest_fit = -1

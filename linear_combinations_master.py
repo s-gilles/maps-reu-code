@@ -1,6 +1,7 @@
 #!/usr/bin/python2
 import argparse
 import fcntl
+import itertools
 import signal
 import os
 import select
@@ -163,12 +164,15 @@ if __name__ == '__main__':
               + 'LinkExteriors, HTLinkExteriors')
         sys.exit(1)
 
-    start_index = 0
+    start_manifold = None
     if worker_args.start_manifold:
         try:
-            l = list(manifolds)
-            start_index = l.index(Manifold(worker_args.start_manifold))
-            manifolds = list(manifolds)[start_index:]
+            target_manifold = Manifold(worker_args.start_manifold)
+            manifold_iterator = iter(manifolds)
+            while True:
+                if manifold_iterator.next() == target_manifold:
+                    break
+            manifolds = itertools.chain([target_manifold], manifold_iterator)
         except:
             print('Could not find start manifold '
                   + worker_args.start_manifold

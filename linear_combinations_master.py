@@ -234,7 +234,7 @@ if __name__ == '__main__':
                         finished_this_manifold = True
                         break
                     elif outputs[idx] == LCC_ENCOUNTERED_ERROR:
-                        print(str(m) + ' : Encountered error.')
+                        print(str(m) + ' : Encountered error')
                         sys.stdout.flush()
                         outputs = outputs[(idx + 1):]
                         idx = 0

@@ -147,6 +147,10 @@ if __name__ == '__main__':
                             type = str,
                             default = None,
                             help = 'Start working at this manifold')
+    arg_parser.add_argument('--end_manifold', '-e',
+                            type = str,
+                            default = None,
+                            help = 'End working at this manifold (inclusive)')
     worker_args = arg_parser.parse_args()
 
     print('Starting up')
@@ -178,6 +182,14 @@ if __name__ == '__main__':
                   + worker_args.start_manifold
                   + ' in census '
                   + worker_args.census)
+            sys.exit(1)
+
+    end_manifold = None
+    if worker_args.end_manifold:
+        try:
+            end_manifold = Manifold(worker_args.end_manifold)
+        except:
+            print('Could not find end manifold')
             sys.exit(1)
 
 
@@ -255,6 +267,9 @@ if __name__ == '__main__':
             except:
                 pass
             worker_process = kickoff_worker()
+
+        if end_manifold and m == end_manifold:
+            break
 
     worker_process.terminate()
     print('Done')

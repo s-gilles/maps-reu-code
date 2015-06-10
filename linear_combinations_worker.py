@@ -109,7 +109,12 @@ lindep_precision = 16
 epsilon_string = '1E-500'
 """Very small number for use in volume culling"""
 
+nfsubfields_cache = dict()
+"""Cache for the costly job of computing subfields"""
+
 def get_nfsubfields(polynomial):
+    if polynomial in nfsubfields_cache:
+        return nfsubfields_cache[polynomial]
     done = False
     nfsubfields_output = []
     polredabs_output = None
@@ -120,7 +125,6 @@ def get_nfsubfields(polynomial):
                     polredabs_output = pari(polynomial).polredabs()
                 except:
                     polredabs_output = pari(polynomial)
-                print(LCC_MAKING_PROGRESS)
                 sys.stdout.flush()
                 nfsubfields_output = polredabs_output.nfsubfields()[1:]
             break
@@ -136,12 +140,12 @@ def get_nfsubfields(polynomial):
         while True:
             try:
                 reduced.append(str(pari(subfield).polredabs()))
-                print(LCC_MAKING_PROGRESS)
                 sys.stdout.flush()
                 break
             except:
                 pari.allocatemem()
     reduced = [ s.replace(' ', '') for s in reduced ]
+    nfsubfields_cache[polynomial] = reduced
     return reduced
 
 def get_pari_lindep(str_vols,

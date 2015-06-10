@@ -3,6 +3,7 @@ import argparse
 import fcntl
 import signal
 import os
+import select
 import subprocess
 import threading
 import time
@@ -34,14 +35,20 @@ def get_next_output(out):
     """
     result = ''
     incremental = ''
-    while True:
-        try:
+    readable = []
+    try:
+        while not readable:
+            readable, w, e = select.select( [ out ], [], [], 0.2 )
+    except select.error as e:
+        _sigint_handler()
+    try:
+        while True:
             incremental = os.read(out.fileno(), 1024)
             if incremental == '':
                 return result
             result = result + incremental
-        except OSError:
-            return result
+    except OSError:
+        return result
 
 def kickoff_worker():
     """Initializes a worker process, waits for it to print out some
@@ -83,13 +90,24 @@ def kickoff_worker():
 
         time.sleep(1)
 
+def _sigint_handler(signum, frame):
+    if worker_process is not None:
+        worker_process.terminate()
+    try:
+        print('Terminating.')
+        sys.stdout.flush()
+    except IOError:
+        pass
+    sys.exit(0)
+
 class TimeoutExpired:
     pass
 
-def raise_exception(signum, frame):
+def _raise_timeout(signum, frame):
     raise TimeoutExpired
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGINT, _sigint_handler)
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument('--spanfile', '-s',
                             default = 'spans.csv',
@@ -111,7 +129,7 @@ if __name__ == '__main__':
                             help = 'Precision to use when calling lindep()')
     arg_parser.add_argument('--timeout', '-t',
                             type = int,
-                            default = 180,
+                            default = 120,
                             help = 'After this much time (in seconds) '
                             + 'without progress, kill worker')
     worker_args = arg_parser.parse_args()
@@ -120,10 +138,11 @@ if __name__ == '__main__':
     sys.stdout.flush()
 
     # Can't figure out a nice way to pass in ranges of manifolds...
-    manifolds = OrientableCuspedCensus
+    manifolds = OrientableCuspedCensus[1152:]
+    # manifolds = OrientableCuspedCensus[145:148]
 
     worker_process = kickoff_worker()
-    signal.signal(signal.SIGALRM, raise_exception)
+    signal.signal(signal.SIGALRM, _raise_timeout)
     for m in manifolds:
         print(str(m) + ' : Computing')
         sys.stdout.flush()

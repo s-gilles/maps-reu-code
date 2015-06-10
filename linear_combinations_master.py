@@ -136,13 +136,46 @@ if __name__ == '__main__':
                             default = 120,
                             help = 'After this much time (in seconds) '
                             + 'without progress, kill worker')
+    arg_parser.add_argument('--census', '-c',
+                            type = str,
+                            default = 'OrientableCuspedCensus',
+                            help = 'Work from this census (must be one '
+                            + 'of OrientableCuspedCensus, '
+                            + 'LinkExteriors, HTLinkExteriors)')
+    arg_parser.add_argument('--start_manifold', '-m',
+                            type = str,
+                            default = None,
+                            help = 'Start working at this manifold')
     worker_args = arg_parser.parse_args()
 
     print('Starting up')
     sys.stdout.flush()
 
-    # Can't figure out a nice way to pass in ranges of manifolds...
-    manifolds = OrientableCuspedCensus
+    manifolds = None
+    if worker_args.census == 'OrientableCuspedCensus':
+        manifolds = OrientableCuspedCensus
+    elif worker_args.census == 'LinkExteriors':
+        manifolds = LinkExteriors
+    elif worker_args.census == 'HTLinkExteriors':
+        manifolds = HTLinkExteriors
+    else:
+        print('Census must be one of OrientableCuspedCensus, '
+              + 'LinkExteriors, HTLinkExteriors')
+        sys.exit(1)
+
+    start_index = 0
+    if worker_args.start_manifold:
+        try:
+            l = list(manifolds)
+            start_index = l.index(Manifold(worker_args.start_manifold))
+            manifolds = list(manifolds)[start_index:]
+        except:
+            print('Could not find start manifold '
+                  + worker_args.start_manifold
+                  + ' in census '
+                  + worker_args.census)
+            sys.exit(1)
+
 
     worker_process = kickoff_worker()
     signal.signal(signal.SIGALRM, _raise_timeout)

@@ -133,7 +133,6 @@ def get_nfsubfields(polynomial):
 
     nfsubfields_output = [ str(x[0]) for x in nfsubfields_output
                            if len(str(x[0])) > 2]
-    print(LCC_MAKING_PROGRESS)
     sys.stdout.flush()
     reduced = list()
     for subfield in nfsubfields_output:
@@ -206,16 +205,13 @@ def handle_manifold(a_string):
                 volumes = []
 
             # First, prune tiny volumes
-            volumes = [ v for v in volumes if pari(str(v)+'>'+epsilon_string) ]
+            volumes = [ str(v) for v in volumes if pari(str(v)+'>'+epsilon_string) ]
 
             # Second, ensure that there are not more than 4 = 8/2
             # volumes, as this would indicate a field we aren't
             # prepared to deal with.
-            volumes = [ str(v) for v in volumes ]
-            positives = set([ v.replace('-', '') for v in volumes
-                              if pari(v+'>'+epsilon_string) ])
             distinct_volumes = list()
-            for v in positives:
+            for v in volumes:
                 matches = [ u for u in distinct_volumes if pari(str(v)+'-'+str(u)+'<='+epsilon_string) ]
                 if not matches:
                     distinct_volumes.append(v)
@@ -251,14 +247,14 @@ def handle_manifold(a_string):
                         if ldp[-1] == 1:
                             break
 
+                    if not ldp or ldp[-1] == 0:
+                        continue
+
                     # Note we lie a little here because we want to
                     # make sure that we aren't killed while writing
                     # the output
                     print(LCC_MAKING_PROGRESS)
                     sys.stdout.flush()
-
-                    if not ldp or ldp[-1] == 0:
-                        continue
 
                     linear_comb_str = ''
                     for n in xrange(len(ldp)-1):
@@ -311,7 +307,7 @@ if __name__ == '__main__':
     if args.precision < 20:
         args.precision = 20
     pari.set_real_precision(args.precision)
-    epsilon_string = '1E-'+str(args.precision)
+    epsilon_string = '1E-'+str(args.precision-3)
     lindep_precision = args.lindep_precision
 
     # Figure out how to handle the output file - should we append the

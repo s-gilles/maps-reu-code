@@ -36,8 +36,12 @@ def get_next_output(out):
     result = ''
     incremental = ''
     readable = []
+    read_tries = 0
     try:
         while not readable:
+            read_tries = read_tries + 1
+            if read_tries > 10:
+                return ''
             readable, w, e = select.select( [ out ], [], [], 0.2 )
     except select.error as e:
         _sigint_handler()
@@ -138,8 +142,7 @@ if __name__ == '__main__':
     sys.stdout.flush()
 
     # Can't figure out a nice way to pass in ranges of manifolds...
-    manifolds = OrientableCuspedCensus[1152:]
-    # manifolds = OrientableCuspedCensus[145:148]
+    manifolds = OrientableCuspedCensus
 
     worker_process = kickoff_worker()
     signal.signal(signal.SIGALRM, _raise_timeout)
@@ -213,3 +216,6 @@ if __name__ == '__main__':
             except:
                 pass
             worker_process = kickoff_worker()
+
+    worker_process.terminate()
+    print('Done')

@@ -185,6 +185,8 @@ if __name__ == '__main__':
         num_tries = 0
         output = ''
         finished_this_manifold = False
+        signal.alarm(0)
+        signal.alarm(worker_args.timeout)
         try:
             if worker_process.poll():
                 worker_process = kickoff_worker()

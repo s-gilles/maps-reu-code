@@ -1102,7 +1102,7 @@ def read_raw_csv(contents, separator = ';'):
             continue
 
         # Force everything into one conjugacy class
-        w[2] = _get_a_plus_b_i_form(w[2])
+        w[5] = _get_a_plus_b_i_form(w[5])
 
         # Incase the disc was 1, a temporary hack:
         # if len(w) == 8:
@@ -1162,7 +1162,6 @@ def read_csv(in_file, separator = ';', sub_separator = '|'):
             continue
         if len(w) == 10:    # pared manifolds weren't supported when this csv was written out
             w.append('')    # acceptable substitute
-
 
         w[2] = _get_a_plus_b_i_form(w[2])
         vol_entry = data.setdefault(w[1],[dict(),w[5]])[0].setdefault(w[2],dict()).setdefault(w[4],[list(),list()])

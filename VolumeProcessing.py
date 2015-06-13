@@ -1094,14 +1094,16 @@ def read_raw_csv(contents, separator = ';'):
         else:
             w = l.replace('\n','').replace('"','').split(separator)
 
-        w[2] = _get_a_plus_b_i_form(w[2])
-
         # Since order got changed (for some unknown reason):
         try:
             w = [w[0],w[9],w[4],w[1],w[5],w[2],w[6],w[3],w[7],w[8]]
         except:
             print('Error with line ' + str(l))
             continue
+
+        # Force everything into one conjugacy class
+        w[2] = _get_a_plus_b_i_form(w[2])
+
         # Incase the disc was 1, a temporary hack:
         # if len(w) == 8:
         #   w.append('')

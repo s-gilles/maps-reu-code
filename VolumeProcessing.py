@@ -399,12 +399,19 @@ class Dataset:
         if not nms:
             return 'NoManifoldKnown'
         optimal = nms[0]
-        
+        optimal_score = _name_badness_score(optimal)
+
         for name in nms:
+
             if len(name) < 2:
                 continue
-            if (len(name) < len(optimal)) or (len(name) == len(optimal) and name < optimal):
+
+            score = _name_badness_score(name)
+
+            if (score < optimal_score) or (score == optimal_score and name < optimal) :
                 optimal = name
+                optimal_score = score
+
         return optimal
 
     def smush_volumes(self, epsilon = EPSILON):
@@ -943,42 +950,40 @@ class VolumeData:
             new_data[poly] = self.data.get(poly, list()) + other.data.get(poly, list())
         return VolumeData(data = new_data)
 
-def _niceness(nm):
-    n = 0.0
-    k = nm[0]
-    if k == 'm':
-        n += 0
-    elif k == 'v':
-        n += 1
-    elif k == 't':
-        n += 2
-    elif k == 'o':
-        n += 3
-    elif k == 'K':  # TODO: apply knot and link # penalties
-        n += 4
-    elif k == 'L':
-        n += 5
-    elif k == 'b':
-        n += 6
-    elif k == 'B':
-        n += 7
-    elif k == 'D':
-        n += 8
+def _name_badness_score(name):
+    score = len(name)
+    if name[0] == 'm' or name[0] in '123456789':
+        score += 0
+    elif name[0] == 'v':
+        score += 1
+    elif name[0] == 't':
+        score += 2
+    elif name[0] == 'o':
+        score += 3
+    elif name[0] == 'K':  # TODO: apply knot and link # penalties
+        score += 5
+    elif name[0] == 'L':
+        score += 6
+    elif name[0] == 'b':
+        score += 10
+    elif name[0] == 'B':
+        score += 11
+    elif name[0] == 'D':
+        score += 12
     else:
-        n += 10
-    # n *= gap TODO
+        score += 20
 
     # Dehn surgery penalties:
-    in_dehn_fill = 0
-    for l in nm[1:]:
-        if l == '(':
-            in_dehn_fill = 1
-        elif l == ')':
-            in_dehn_fill = 0
-        elif l in '123456789' and in_dehn_fill:
-            n += 0.5
+    in_dehn_fill = False
+    for char in name[1:]:
+        if char == '(':
+            in_dehn_fill = True
+        elif char == ')':
+            in_dehn_fill = False
+        elif char in '123456789' and in_dehn_fill:
+            score += 1
 
-    return n
+    return score
 
 def quick_read_csv(filenm, separator = ';', sub_separator = '|'):
     """
@@ -1067,12 +1072,11 @@ def up_to_sign(x,y):
     """
     return re.search(r'[\d.]+',x).group() == re.search(r'[\d.]+',y).group()
 
-def _get_conjs(z):
+def _get_a_plus_b_i_form(z):
+    """Given a+b*I or a-b*I (in string form), return a+b*I
+
     """
-    Given a+b*I (in string form), return a\pm b*I, where \pm is the
-    unicode plus/minus character.
-    """
-    return z[:1]+z[1:].replace('+','\xb1').replace('-','\xb1')
+    return z[:1]+z[1:].replace('-','+')
 
 def read_raw_csv(contents, separator = ';'):
     """
@@ -1089,6 +1093,8 @@ def read_raw_csv(contents, separator = ';'):
             w = re.findall('"([^"]*)"', l)
         else:
             w = l.replace('\n','').replace('"','').split(separator)
+
+        w[2] = _get_a_plus_b_i_form(w[2])
 
         # Since order got changed (for some unknown reason):
         try:
@@ -1154,12 +1160,16 @@ def read_csv(in_file, separator = ';', sub_separator = '|'):
             continue
         if len(w) == 10:    # pared manifolds weren't supported when this csv was written out
             w.append('')    # acceptable substitute
+
+
+        w[2] = _get_a_plus_b_i_form(w[2])
         vol_entry = data.setdefault(w[1],[dict(),w[5]])[0].setdefault(w[2],dict()).setdefault(w[4],[list(),list()])
         vol_entry[0].append((w[0],w[9],w[6]))
         vol_entry[1].extend(w[10].split(sub_separator))
         vol_entry[1] = list(set(vol_entry[1]))  # remove duplicates
         if len(data[w[1]]) == 2:
             data[w[1]].extend([w[3],w[7],w[8]])
+
     return Dataset(data)
 
 def _list_str(lst,sep):
@@ -1240,12 +1250,9 @@ def _span_guesses(data):
         if ncp < 1:
             continue
         try:
-            roots = set([_get_conjs(r) for r in data.get_roots(poly)])  # turn roots into equivalence classes of conjugation
+            roots = set(data.get_roots(poly))  # note roots are strictly in a+b*I form
             for root in roots:
-                vols = list()
-                for other in data.get_roots(poly):
-                    if _up_to_conjugates(root,other):
-                        vols.extend([(v,data.get_nice_manifold_name(poly,other,v)) for v in data.get_volumes(poly,other)])
+                vols = [(v,data.get_nice_manifold_name(poly, root, v)) for v in data.get_volumes(poly, root) ]
                 vols = [v for v in vols if gen.pari(str(v[0]) + ' > 0.9') ]
                 if not vols:
                     continue

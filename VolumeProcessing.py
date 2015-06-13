@@ -383,22 +383,29 @@ class Dataset:
         nms = [rec[0] for rec in self.get_manifold_data(poly,root,vol)] # don't fix if not broke
         nms.extend(self.get_pared_manifolds(poly,root,vol))
         if epsilon != 0:
+            u='(1/0)'
             try:
-                u = float(vol)
+                u = float(vol) # For ValueError
+                u = str(vol)
             except ValueError:  # Give up on epsilon stuff
                 return get_nice_manifold_name(self,poly,root,vol,epsilon=0)
             for v in self.get_volumes(poly,root):
                 try:
-                    if abs(float(v) - u) < epsilon:
+                    if gen.pari('abs('+str(v)+' - '+str(u)+')<'+str(epsilon)):
                         nms.extend([rec[0] for rec in self.get_manifold_data(poly,root,v)])
                         nms.extend(self.get_pared_manifolds(poly,root,v))
-                except ValueError:  # again bad float, probably 0+
+                except:  # again bad float, probably 0+
                     continue
-        opt = ('', sys.float_info.max)
-        for nm in nms:
-            if 0 < len(nm) < opt[1]:    # TODO: finish _niceness and replace len with it; why is 0 < required?
-                opt = (nm,len(nm))
-        return opt[0]
+        if not nms:
+            return 'NoManifoldKnown'
+        optimal = nms[0]
+        
+        for name in nms:
+            if len(name) < 2:
+                continue
+            if (len(name) < len(optimal)) or (len(name) == len(optimal) and name < optimal):
+                optimal = name
+        return optimal
 
     def smush_volumes(self, epsilon = EPSILON):
         """

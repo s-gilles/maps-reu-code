@@ -965,11 +965,11 @@ def _name_badness_score(name):
     elif name[0] == 'L':
         score += 6
     elif name[0] == 'b':
-        score += 10
+        score += 20
     elif name[0] == 'B':
-        score += 11
+        score += 21
     elif name[0] == 'D':
-        score += 12
+        score += 52
     else:
         score += 20
 

@@ -74,9 +74,9 @@ class Span:
     """
 
 
-    def __init__(self, _polynomial, _number_of_complex_places, _root,
+    def __init__(self, _polynomial, _degree, _number_of_complex_places, _root,
                  _span_dimension, _volume_span, _manifold_span,
-                 _fit_ratio):
+                 _fit_ratio, _borel_regulator_matrix, _borel_regulator_det):
         """Constructor"""
         self.polynomial = _polynomial
         self.number_of_complex_places = int(_number_of_complex_places)
@@ -205,14 +205,14 @@ def handle_manifold(a_string):
                 volumes = []
 
             # First, prune tiny volumes
-            volumes = [ str(v) for v in volumes if pari(str(v)+'>'+epsilon_string) ]
+            volumes = [ str(v) for v in volumes if pari('abs('+str(v)+')>'+epsilon_string) ]
 
             # Second, ensure that there are not more than 4 = 8/2
             # volumes, as this would indicate a field we aren't
             # prepared to deal with.
             distinct_volumes = list()
             for v in volumes:
-                matches = [ u for u in distinct_volumes if pari(str(v)+'-'+str(u)+'<='+epsilon_string) ]
+                matches = [ u for u in distinct_volumes if pari('abs(abs('+str(v)+')-abs('+str(u)+'))<='+epsilon_string) ]
                 if not matches:
                     distinct_volumes.append(v)
             if len(distinct_volumes) > 4:

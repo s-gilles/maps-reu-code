@@ -197,9 +197,6 @@ def handle_manifold(a_string):
         spans_for_polynomial = None
         for s in decomposition:
             obstruction_class = obstruction_class + 1
-            polynomial = str(s.number_field()).replace(' ', '')
-            subfields = None
-            spans_for_polynomial = None
             volumes = s.solutions(numerical = True).volume_numerical()
             if not volumes:
                 volumes = []
@@ -220,10 +217,11 @@ def handle_manifold(a_string):
 
             # Now we need to get the possible subfields. This is the
             # most intensive part.
-            if not subfields:
-                subfields = get_nfsubfields(polynomial)
-                print(LCC_MAKING_PROGRESS)
-                sys.stdout.flush()
+            polynomial = str(s.number_field()).replace(' ', '')
+            spans_for_polynomial = None
+            subfields = get_nfsubfields(polynomial)
+            print(LCC_MAKING_PROGRESS)
+            sys.stdout.flush()
 
             for subfield in subfields:
                 # For every root of the polynomial, try and fit the data

@@ -197,7 +197,7 @@ def handle_manifold(a_string):
         spans_for_polynomial = None
         for s in decomposition:
             obstruction_class = obstruction_class + 1
-            volumes = s.solutions(numerical = True).volume_numerical()
+            volumes = s.solutions(numerical = True).volume_numerical().flatten()
             if not volumes:
                 volumes = []
 

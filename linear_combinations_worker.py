@@ -202,7 +202,8 @@ def handle_manifold(a_string):
                 volumes = []
 
             # First, prune tiny volumes
-            volumes = [ str(v) for v in volumes if pari('abs('+str(v)+')>'+epsilon_string) ]
+            volumes = [ str(pari('abs('+str(v)+')')) for v in volumes ]
+            volumes = [ str(v) for v in volumes if pari(str(v)+'>'+epsilon_string) ]
 
             # Second, ensure that there are not more than 4 = 8/2
             # volumes, as this would indicate a field we aren't
